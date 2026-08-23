@@ -1,5 +1,5 @@
 // File: src/screens/ai/AIChatAssistantScreen.js
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,72 +10,74 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { ArrowLeft, Send, Bot, User } from 'lucide-react-native';
 import Colors from '../../theme/colors';
+import useChatStore from '../../store/useChatStore';
 
 const AIChatAssistantScreen = ({ navigation }) => {
-  const [messages, setMessages] = useState([
-    {
-      id: '1',
-      sender: 'bot',
-      text: 'Bonjour ! Je suis votre assistant InHome. Décrivez votre besoin ou vos travaux et je vous aiderai à estimer le prix et trouver le bon artisan.',
-    },
-  ]);
   const [inputText, setInputText] = useState('');
+  const flatListRef = useRef(null);
+
+  const messages = useChatStore((state) => state.messages);
+  const isTyping = useChatStore((state) => state.isTyping);
+  const addMessage = useChatStore((state) => state.addMessage);
+  const setIsTyping = useChatStore((state) => state.setIsTyping);
 
   const handleSend = () => {
     if (!inputText.trim()) return;
 
-    const userMsg = {
-      id: Date.now().toString(),
-      sender: 'user',
-      text: inputText.trim(),
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
+    const userContent = inputText.trim();
     setInputText('');
 
+    // Add user message to global store
+    addMessage({
+      role: 'user',
+      content: userContent,
+    });
+
+    // Indicate assistant is typing
+    setIsTyping(true);
+
+    // TODO: Implement SSE connection
+
     setTimeout(() => {
-      const botReply = {
-        id: (Date.now() + 1).toString(),
-        sender: 'bot',
-        text: `Merci pour ces détails. Pour ce type d'intervention, nous estimons une fourchette de 200 à 450 DH selon l'ampleur. Souhaitez-vous demander une intervention à domicile ou un devis à distance ?`,
-      };
-      setMessages((prev) => [...prev, botReply]);
-    }, 1000);
+      // Scroll to end when new messages arrive
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   };
 
   const renderMessage = ({ item }) => {
-    const isBot = item.sender === 'bot';
+    const isUser = item.role === 'user';
     return (
       <View
         style={[
           styles.messageRow,
-          isBot ? styles.messageRowLeft : styles.messageRowRight,
+          isUser ? styles.messageRowRight : styles.messageRowLeft,
         ]}
       >
-        {isBot && (
-          <View style={styles.botAvatar}>
-            <Bot size={16} color={Colors.accent} />
+        {!isUser && (
+          <View style={styles.assistantAvatar}>
+            <Bot size={16} color={Colors.white} />
           </View>
         )}
         <View
           style={[
             styles.bubble,
-            isBot ? styles.bubbleBot : styles.bubbleUser,
+            isUser ? styles.bubbleUser : styles.bubbleAssistant,
           ]}
         >
           <Text
             style={[
               styles.messageText,
-              isBot ? styles.messageTextBot : styles.messageTextUser,
+              isUser ? styles.messageTextUser : styles.messageTextAssistant,
             ]}
           >
-            {item.text}
+            {item.content}
           </Text>
         </View>
-        {!isBot && (
+        {isUser && (
           <View style={styles.userAvatar}>
             <User size={16} color={Colors.white} />
           </View>
@@ -88,6 +90,7 @@ const AIChatAssistantScreen = ({ navigation }) => {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <StatusBar barStyle="light-content" backgroundColor={Colors.surfaceContainer} />
 
@@ -102,26 +105,42 @@ const AIChatAssistantScreen = ({ navigation }) => {
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Assistant InHome AI</Text>
-          <Text style={styles.headerSubtitle}>En ligne • Diagnostic & Devis</Text>
+          <Text style={styles.headerSubtitle}>Diagnostic & Devis instantané</Text>
         </View>
       </View>
 
-      {/* Chat Messages */}
+      {/* Chat Messages List */}
       <FlatList
+        ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
         contentContainerStyle={styles.chatList}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        ListFooterComponent={
+          isTyping ? (
+            <View style={styles.typingIndicatorRow}>
+              <View style={styles.assistantAvatar}>
+                <Bot size={16} color={Colors.white} />
+              </View>
+              <View style={[styles.bubble, styles.bubbleAssistant, styles.typingBubble]}>
+                <ActivityIndicator size="small" color="#FF6B00" />
+                <Text style={styles.typingText}>L'assistant écrit...</Text>
+              </View>
+            </View>
+          ) : null
+        }
       />
 
       {/* Input Area */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="Décrivez votre problème..."
+          placeholder="Décrivez votre besoin..."
           placeholderTextColor={Colors.onSurfaceVariant}
           value={inputText}
           onChangeText={setInputText}
+          multiline={false}
         />
         <TouchableOpacity
           style={[
@@ -136,7 +155,7 @@ const AIChatAssistantScreen = ({ navigation }) => {
             size={20}
             color={
               inputText.trim().length > 0
-                ? Colors.background
+                ? Colors.white
                 : Colors.onSurfaceVariant
             }
           />
@@ -159,7 +178,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: Colors.surfaceContainer,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.outlineVariant,
+    borderBottomColor: Colors.surfaceContainerHigh,
     gap: 12,
   },
   backBtn: {
@@ -179,17 +198,17 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 12,
-    color: Colors.accent,
+    color: '#FF6B00',
   },
   chatList: {
     padding: 16,
-    gap: 16,
+    paddingBottom: 24,
   },
   messageRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 8,
-    marginVertical: 4,
+    marginVertical: 6,
   },
   messageRowLeft: {
     justifyContent: 'flex-start',
@@ -197,11 +216,11 @@ const styles = StyleSheet.create({
   messageRowRight: {
     justifyContent: 'flex-end',
   },
-  botAvatar: {
+  assistantAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.surfaceContainerHighest,
+    backgroundColor: '#333333',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -209,40 +228,59 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.surfaceVariant,
+    backgroundColor: '#FF6B00',
     alignItems: 'center',
     justifyContent: 'center',
   },
   bubble: {
     maxWidth: '75%',
-    padding: 14,
-    borderRadius: 16,
-  },
-  bubbleBot: {
-    backgroundColor: Colors.surfaceContainerHigh,
-    borderBottomLeftRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 18,
   },
   bubbleUser: {
-    backgroundColor: Colors.secondaryContainer,
+    backgroundColor: '#FF6B00',
     borderBottomRightRadius: 4,
+  },
+  bubbleAssistant: {
+    backgroundColor: '#333333',
+    borderBottomLeftRadius: 4,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 22,
   },
-  messageTextBot: {
+  messageTextUser: {
+    color: Colors.white,
+    fontWeight: '500',
+  },
+  messageTextAssistant: {
     color: Colors.onSurface,
   },
-  messageTextUser: {
-    color: Colors.onBackground,
+  typingIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 6,
+  },
+  typingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  typingText: {
+    fontSize: 13,
+    color: Colors.onSurfaceVariant,
+    fontStyle: 'italic',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: Colors.surfaceContainer,
     borderTopWidth: 1,
-    borderTopColor: Colors.outlineVariant,
+    borderTopColor: Colors.surfaceContainerHigh,
     gap: 12,
   },
   input: {
@@ -250,7 +288,7 @@ const styles = StyleSheet.create({
     height: 48,
     backgroundColor: Colors.surfaceContainerHigh,
     borderRadius: 24,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     fontSize: 15,
     color: Colors.onSurface,
   },
@@ -263,7 +301,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendBtnActive: {
-    backgroundColor: Colors.accent,
+    backgroundColor: '#FF6B00',
   },
 });
 
