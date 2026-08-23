@@ -1,22 +1,29 @@
 // File: src/store/useLocationStore.js
 import { create } from 'zustand';
 
-export const useLocationStore = create((set) => ({
-  currentLocation: {
-    latitude: 31.6295,
-    longitude: -7.9811,
-    address: 'Av. Marrakech, Marrakech',
-  },
-  savedAddresses: [
-    { id: '1', name: 'Av. Marrakech', subtitle: 'Appartement 12, 3ème étage' },
-    { id: '2', name: 'Rue Ibn Batouta', subtitle: 'Villa 45' },
-  ],
-  hasPermission: false,
+/**
+ * Default location for Fquih Ben Salah, Morocco
+ */
+const DEFAULT_COORDS = {
+  latitude: 32.5000,
+  longitude: -6.6833,
+};
 
-  setPermission: (granted) => set({ hasPermission: granted }),
-  setCurrentLocation: (location) => set({ currentLocation: location }),
-  addSavedAddress: (address) =>
-    set((state) => ({
-      savedAddresses: [address, ...state.savedAddresses],
-    })),
+/**
+ * Zustand store for managing user location and permission status.
+ */
+const useLocationStore = create((set) => ({
+  userLocation: null,
+  permissionStatus: 'undetermined', // 'granted' | 'denied' | 'skipped' | 'undetermined'
+
+  setLocation: (coords) => set({ userLocation: coords }),
+  setPermissionStatus: (status) => set({ permissionStatus: status }),
+
+  setDefaultLocation: () =>
+    set({
+      userLocation: DEFAULT_COORDS,
+      permissionStatus: 'skipped',
+    }),
 }));
+
+export default useLocationStore;
