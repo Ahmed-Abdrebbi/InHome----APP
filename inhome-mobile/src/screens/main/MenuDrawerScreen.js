@@ -21,7 +21,7 @@ import {
   MessageCircle,
   ChevronRight,
   Star,
-  Instagram,
+  Camera,
   Music,
   Users,
 } from 'lucide-react-native';
@@ -132,7 +132,7 @@ const MenuDrawerScreen = ({ navigation }) => {
               <MessageCircle size={22} color={Colors.outline} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialBtn}>
-              <Instagram size={22} color={Colors.outline} />
+              <Camera size={22} color={Colors.outline} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialBtn}>
               <Users size={22} color={Colors.outline} />
