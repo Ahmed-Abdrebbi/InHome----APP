@@ -1,149 +1,235 @@
 // File: src/screens/main/MapHomeScreen.js
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
   TouchableOpacity,
-  ScrollView,
+  Alert,
+  Platform,
 } from 'react-native';
+import MapView, { Marker, Callout } from '../../components/Map/CustomMapView';
+import * as Location from 'expo-location';
 import {
   Menu,
-  Search,
   Wrench,
-  Paintbrush,
   Zap,
-  Droplets,
-  ChevronRight,
-  Clock,
+  Paintbrush,
+  Star,
 } from 'lucide-react-native';
-import Colors from '../../theme/colors';
-import ServiceCategoryItem from '../../components/Cards/ServiceCategoryItem';
+import BottomSheetContainer from '../../components/UI/BottomSheetContainer';
+import useMapStore from '../../store/useMapStore';
+import useLocationStore from '../../store/useLocationStore';
 
 /**
- * Main Map Home screen matching the Stitch "InHome Client Home Screen" / "Accueil Client" design.
- * Features:
- *  - Full-screen dark map background
- *  - Floating menu button (top-left)
- *  - Service category pills
- *  - Bottom sheet with search bar and recent addresses
+ * Custom dark map style for Google Maps & Apple Maps
  */
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#1A1D24' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8A92A6' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1A1D24' }] },
+  {
+    featureType: 'administrative.locality',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#DCE1EB' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#6C757D' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'geometry',
+    stylers: [{ color: '#15222E' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#2C3240' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry.stroke',
+    stylers: [{ color: '#202530' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#3A4254' }],
+  },
+  {
+    featureType: 'transit',
+    elementType: 'geometry',
+    stylers: [{ color: '#242B38' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#0F141C' }],
+  },
+];
+
+const INITIAL_REGION = {
+  latitude: 32.5000,
+  longitude: -6.6833,
+  latitudeDelta: 0.04,
+  longitudeDelta: 0.04,
+};
+
+/**
+ * Helper to get icon component based on provider category
+ */
+const getCategoryIcon = (category) => {
+  switch (category) {
+    case 'Électricité':
+      return Zap;
+    case 'Peinture':
+      return Paintbrush;
+    case 'Plomberie':
+    default:
+      return Wrench;
+  }
+};
+
 const MapHomeScreen = ({ navigation }) => {
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const mapRef = useRef(null);
 
-  const categories = [
-    { id: 'plumbing', label: 'Plomberie', icon: <Droplets size={16} color={Colors.onSurface} /> },
-    { id: 'electrical', label: 'Électricité', icon: <Zap size={16} color={Colors.onSurface} /> },
-    { id: 'painting', label: 'Peinture', icon: <Paintbrush size={16} color={Colors.onSurface} /> },
-    { id: 'renovation', label: 'Rénovation', icon: <Wrench size={16} color={Colors.onSurface} /> },
-  ];
+  const selectedCategory = useMapStore((state) => state.selectedCategory);
+  const providers = useMapStore((state) => state.providers);
+  const userLocation = useLocationStore((state) => state.userLocation);
 
-  const recentAddresses = [
-    { id: '1', name: 'Av. Marrakech', subtitle: 'Appartement 12, 3ème étage' },
-    { id: '2', name: 'Rue Ibn Batouta', subtitle: 'Villa 45' },
-  ];
+  // Dynamic filtering of providers
+  const filteredProviders =
+    selectedCategory === 'All'
+      ? providers
+      : providers.filter((p) => p.category === selectedCategory);
+
+  const initialLocation = userLocation || INITIAL_REGION;
+
+  /**
+   * Geocode a Moroccan city and animate MapView camera
+   */
+  const handleSearchCity = async (cityName) => {
+    try {
+      const query = cityName.toLowerCase().includes('morocco') || cityName.toLowerCase().includes('maroc')
+        ? cityName
+        : `${cityName}, Morocco`;
+
+      const results = await Location.geocodeAsync(query);
+
+      if (results && results.length > 0) {
+        const { latitude, longitude } = results[0];
+        mapRef.current?.animateToRegion(
+          {
+            latitude,
+            longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          },
+          1000
+        );
+      } else {
+        Alert.alert(
+          'Ville non trouvée',
+          `Impossible de localiser "${cityName}". Veuillez vérifier le nom de la ville.`
+        );
+      }
+    } catch (error) {
+      console.warn('Geocoding error:', error);
+      Alert.alert(
+        'Recherche impossible',
+        'Une erreur est survenue lors de la recherche de la ville.'
+      );
+    }
+  };
+
+  const handleSelectAddress = (address) => {
+    navigation && navigation.navigate('ProviderDetails', { address: address.name });
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Map Background */}
-      <View style={styles.mapContainer}>
-        <View style={styles.mapPlaceholder}>
-          {/* Grid pattern to simulate dark map */}
-          <View style={styles.mapGrid}>
-            {Array.from({ length: 20 }).map((_, i) => (
-              <View key={`h-${i}`} style={[styles.gridLineH, { top: i * 40 }]} />
-            ))}
-            {Array.from({ length: 12 }).map((_, i) => (
-              <View key={`v-${i}`} style={[styles.gridLineV, { left: i * 36 }]} />
-            ))}
-          </View>
-
-          {/* Center pin */}
-          <View style={styles.centerPin}>
-            <View style={styles.pinOuter}>
-              <View style={styles.pinInner} />
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Floating Menu Button */}
-      <TouchableOpacity
-        style={styles.menuButton}
-        onPress={() => navigation && navigation.navigate('MenuDrawer')}
-        activeOpacity={0.8}
+      {/* Live Interactive Map */}
+      <MapView
+        ref={mapRef}
+        style={StyleSheet.absoluteFillObject}
+        initialRegion={{
+          latitude: initialLocation.latitude,
+          longitude: initialLocation.longitude,
+          latitudeDelta: 0.04,
+          longitudeDelta: 0.04,
+        }}
+        customMapStyle={DARK_MAP_STYLE}
+        showsUserLocation={true}
+        showsCompass={false}
       >
-        <Menu size={24} color={Colors.onSurface} />
-      </TouchableOpacity>
+        {filteredProviders.map((provider) => {
+          const IconComponent = getCategoryIcon(provider.category);
+          return (
+            <Marker
+              key={provider.id}
+              coordinate={{
+                latitude: provider.latitude,
+                longitude: provider.longitude,
+              }}
+              title={provider.name}
+              description={`${provider.category} • ${provider.price}`}
+            >
+              {/* Custom Marker Pin */}
+              <View style={styles.markerContainer}>
+                <View style={styles.markerCircle}>
+                  <IconComponent size={16} color="#FFFFFF" />
+                </View>
+                <View style={styles.markerTriangle} />
+              </View>
 
-      {/* Bottom Sheet - Always visible */}
-      <View style={styles.bottomSheet}>
-        {/* Handle */}
-        <View style={styles.handleContainer}>
-          <View style={styles.handle} />
-        </View>
+              {/* Callout Popup */}
+              <Callout
+                tooltip
+                onPress={() =>
+                  navigation &&
+                  navigation.navigate('ProviderDetails', { provider })
+                }
+              >
+                <View style={styles.calloutCard}>
+                  <Text style={styles.calloutName}>{provider.name}</Text>
+                  <Text style={styles.calloutCategory}>
+                    {provider.category} • {provider.price}
+                  </Text>
+                  <View style={styles.calloutRating}>
+                    <Star size={12} color="#FF6B00" fill="#FF6B00" />
+                    <Text style={styles.calloutRatingText}>
+                      {provider.rating} ({provider.reviewsCount} avis)
+                    </Text>
+                  </View>
+                </View>
+              </Callout>
+            </Marker>
+          );
+        })}
+      </MapView>
 
-        {/* Search Bar */}
+      {/* Floating UI Overlays */}
+      <View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'box-none' }]}>
+        {/* Hamburger Menu Button */}
         <TouchableOpacity
-          style={styles.searchBar}
-          onPress={() => navigation && navigation.navigate('SearchService')}
-          activeOpacity={0.8}
+          style={styles.menuButton}
+          onPress={() => navigation && navigation.navigate('MenuDrawer')}
+          activeOpacity={0.85}
         >
-          <Search size={20} color={Colors.onSurfaceVariant} />
-          <Text style={styles.searchPlaceholder}>
-            De quoi avez-vous besoin ?
-          </Text>
+          <Menu size={22} color="#FFFFFF" />
         </TouchableOpacity>
 
-        {/* Service Categories */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesContainer}
-        >
-          {categories.map((cat) => (
-            <ServiceCategoryItem
-              key={cat.id}
-              icon={cat.icon}
-              label={cat.label}
-              isSelected={selectedCategory === cat.id}
-              onPress={() =>
-                setSelectedCategory(
-                  selectedCategory === cat.id ? null : cat.id
-                )
-              }
-            />
-          ))}
-        </ScrollView>
-
-        {/* Recent Addresses */}
-        <View style={styles.recentSection}>
-          <Text style={styles.recentTitle}>Adresses Récentes</Text>
-          {recentAddresses.map((addr) => (
-            <TouchableOpacity
-              key={addr.id}
-              style={styles.addressRow}
-              activeOpacity={0.7}
-              onPress={() =>
-                navigation &&
-                navigation.navigate('ProviderDetails', {
-                  address: addr.name,
-                })
-              }
-            >
-              <View style={styles.addressIcon}>
-                <Clock size={18} color={Colors.onSurfaceVariant} />
-              </View>
-              <View style={styles.addressContent}>
-                <Text style={styles.addressName}>{addr.name}</Text>
-                <Text style={styles.addressSubtitle}>{addr.subtitle}</Text>
-              </View>
-              <ChevronRight size={18} color={Colors.onSurfaceVariant} />
-            </TouchableOpacity>
-          ))}
+        {/* Bottom Sheet Section */}
+        <View style={styles.bottomSheetWrapper}>
+          <BottomSheetContainer
+            onSearchCity={handleSearchCity}
+            onSelectAddress={handleSelectAddress}
+          />
         </View>
       </View>
     </View>
@@ -153,161 +239,98 @@ const MapHomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  mapContainer: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  mapPlaceholder: {
-    flex: 1,
-    backgroundColor: Colors.mapNavy,
-  },
-  mapGrid: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.15,
-  },
-  gridLineH: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: Colors.white,
-  },
-  gridLineV: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 1,
-    backgroundColor: Colors.white,
-  },
-  centerPin: {
-    position: 'absolute',
-    top: '38%',
-    left: '50%',
-    marginLeft: -12,
-    alignItems: 'center',
-  },
-  pinOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: `${Colors.onBackground}1A`,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pinInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.onBackground,
+    backgroundColor: '#121212',
   },
   menuButton: {
     position: 'absolute',
-    top: 52,
-    left: 16,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.surfaceContainer,
+    top: Platform.OS === 'ios' ? 56 : 48,
+    left: 20,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#212121',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    borderWidth: 1,
+    borderColor: '#333333',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 6,
-    zIndex: 50,
+    zIndex: 10,
   },
-  bottomSheet: {
+  markerContainer: {
+    alignItems: 'center',
+  },
+  markerCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FF6B00',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  markerTriangle: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#FF6B00',
+    alignSelf: 'center',
+    marginTop: -1,
+  },
+  calloutCard: {
+    backgroundColor: '#212121',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#383838',
+    width: 180,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  calloutName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  calloutCategory: {
+    fontSize: 12,
+    color: '#B0B0B0',
+    marginBottom: 4,
+  },
+  calloutRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  calloutRatingText: {
+    fontSize: 11,
+    color: '#FF6B00',
+    fontWeight: '600',
+  },
+  bottomSheetWrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.surfaceContainerHighest,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 40,
-    elevation: 24,
-    borderTopWidth: 1,
-    borderTopColor: Colors.surfaceContainerHigh,
-  },
-  handleContainer: {
-    alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 20,
-  },
-  handle: {
-    width: 48,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.outlineVariant,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: Colors.surfaceContainer,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 16,
-  },
-  searchPlaceholder: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: Colors.onSurfaceVariant,
-    flex: 1,
-  },
-  categoriesContainer: {
-    gap: 8,
-    paddingBottom: 20,
-  },
-  recentSection: {
-    gap: 4,
-  },
-  recentTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 1,
-    color: Colors.onSurfaceVariant,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  addressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: `${Colors.outlineVariant}40`,
-  },
-  addressIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surfaceContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addressContent: {
-    flex: 1,
-  },
-  addressName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.onBackground,
-    lineHeight: 24,
-  },
-  addressSubtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: Colors.onSurfaceVariant,
-    lineHeight: 20,
   },
 });
 
