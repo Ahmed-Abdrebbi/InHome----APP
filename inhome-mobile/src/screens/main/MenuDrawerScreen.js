@@ -30,15 +30,6 @@ import PrimaryButton from '../../components/UI/PrimaryButton';
 
 const { width } = Dimensions.get('window');
 
-/**
- * Side drawer navigation matching the Stitch "Menu de navigation" design.
- * 80% width drawer with:
- *  - User profile header with avatar, name, rating
- *  - Navigation menu items with icons
- *  - "Devenir prestataire" CTA
- *  - Social media icons at bottom
- *  - Dimmed right overlay for closing
- */
 const MenuDrawerScreen = ({ navigation }) => {
   const menuItems = [
     { icon: FileText, label: 'Mes demandes', key: 'requests' },
