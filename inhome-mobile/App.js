@@ -1,21 +1,12 @@
 // File: App.js
 import React from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet } from 'react-native';
-import AppNavigator from './src/navigation/AppNavigator';
+import AppProviders from './src/app/providers/AppProviders';
+import RootNavigator from './src/app/navigation/RootNavigator';
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <StatusBar style="light" />
-      <AppNavigator />
-    </GestureHandlerRootView>
+    <AppProviders>
+      <RootNavigator />
+    </AppProviders>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-});

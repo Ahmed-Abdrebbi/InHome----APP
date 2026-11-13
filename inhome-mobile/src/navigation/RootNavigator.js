@@ -1,2 +1,2 @@
-// File: src/navigation/RootNavigator.js
-export { default } from './AppNavigator';
+// File: src/navigation/RootNavigator.js (Shim)
+export { default } from '../app/navigation/RootNavigator';

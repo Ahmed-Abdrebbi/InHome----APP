@@ -1,5 +1,1 @@
-// File: src/components/Map/CustomMapView.native.js
-import MapView, { Marker, Callout } from 'react-native-maps';
-
-export { Marker, Callout };
-export default MapView;
+export { default } from '../../shared/components/map/CustomMapView.native';
