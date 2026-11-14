@@ -1,4 +1,4 @@
-// File: src/screens/booking/PriceProposalScreen.js
+// File: src/features/booking/screens/PriceProposalScreen.js
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Animated,
   Switch,
-  Dimensions,
+  Alert,
 } from 'react-native';
 import {
   X,
@@ -17,32 +17,18 @@ import {
   Wrench,
   Check,
 } from 'lucide-react-native';
-import Colors from '../../../core/theme/legacyColors';
+import { useTheme } from '../../../core/theme';
+import { useBookingStore } from '../store/useBookingStore';
 import PrimaryButton from '../../../shared/components/ui/PrimaryButton';
 import CustomKeypad from '../../../shared/components/ui/CustomKeypad';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-/**
- * Price proposal bottom-sheet screen matching the Stitch "Proposer votre prix" design.
- * Features:
- *  - Map background (dimmed)
- *  - Bottom sheet (80% height) with:
- *    - Drag handle, header + close button
- *    - Price input with MAD currency + blinking cursor
- *    - Payment method selector (Cash)
- *    - Service type pill toggles (Intervention / Devis)
- *    - Material toggle switch
- *    - Confirm button (disabled when no price)
- *  - Full numeric keypad at bottom
- */
 const PriceProposalScreen = ({ navigation }) => {
-  const [price, setPrice] = useState('');
+  const { theme } = useTheme();
+  const { draft, setProposedPrice, updateDraft } = useBookingStore();
+
+  const [price, setPrice] = useState(draft?.proposedPrice ? String(draft.proposedPrice) : '80');
   const [materialIncluded, setMaterialIncluded] = useState(false);
-  const [selectedTypes, setSelectedTypes] = useState([
-    'intervention',
-    'devis',
-  ]);
+  const [selectedTypes, setSelectedTypes] = useState(['intervention']);
   const cursorAnim = useRef(new Animated.Value(1)).current;
 
   // Blinking cursor animation
@@ -66,123 +52,188 @@ const PriceProposalScreen = ({ navigation }) => {
   }, []);
 
   const handleKeyPress = (key) => {
-    if (price.length < 7) {
-      setPrice((prev) => prev + key);
+    if (price.length < 5) {
+      setPrice((prev) => (prev === '0' ? key : prev + key));
     }
   };
 
   const handleDelete = () => {
-    setPrice((prev) => prev.slice(0, -1));
+    setPrice((prev) => (prev.length > 0 ? prev.slice(0, -1) : ''));
   };
 
   const toggleType = (type) => {
     setSelectedTypes((prev) =>
-      prev.includes(type)
-        ? prev.filter((t) => t !== type)
-        : [...prev, type]
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
     );
   };
 
-  const isConfirmEnabled = price.length > 0 && parseInt(price, 10) > 0;
+  const numPrice = parseInt(price || '0', 10);
+  const isConfirmEnabled = numPrice >= 20;
+
+  const handleConfirm = () => {
+    if (numPrice < 20) {
+      Alert.alert('Prix minimum', 'Le prix minimum pour une intervention est de 20 DH.');
+      return;
+    }
+
+    setProposedPrice(numPrice);
+    updateDraft({
+      tier: selectedTypes.includes('devis') ? 'devis' : 'standard',
+      materialIncluded,
+    });
+
+    if (navigation) {
+      navigation.goBack();
+    }
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Dimmed map background */}
+      {/* Dimmed background */}
       <View style={styles.mapBg}>
         <View style={styles.mapDim} />
       </View>
 
-      {/* Bottom Sheet Modal (80% height) */}
-      <View style={styles.sheet}>
+      {/* Bottom Sheet Modal */}
+      <View
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: theme.surfaceElevated || '#1E212A',
+            borderTopColor: theme.border,
+          },
+        ]}
+      >
         {/* Drag Handle */}
         <View style={styles.handleRow}>
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: theme.borderSubtle }]} />
         </View>
 
         {/* Scrollable content area */}
         <View style={styles.sheetContent}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Proposer votre prix</Text>
+            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+              Proposer votre prix
+            </Text>
             <TouchableOpacity
               style={styles.closeBtn}
               onPress={() => navigation && navigation.goBack()}
               activeOpacity={0.7}
             >
-              <X size={28} color={Colors.onSurfaceVariant} />
+              <X size={24} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          {/* Price Input */}
-          <View style={styles.priceContainer}>
-            <Text style={styles.currencyLabel}>MAD</Text>
+          {/* Price Input Display */}
+          <View style={[styles.priceContainer, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.currencyLabel, { color: theme.textSecondary }]}>MAD</Text>
             <View style={styles.priceInputRow}>
-              <Text style={styles.priceValue}>
-                {price || ''}
+              <Text style={[styles.priceValue, { color: theme.textPrimary }]}>
+                {price || '0'}
               </Text>
               <Animated.View
                 style={[
                   styles.cursor,
-                  { opacity: cursorAnim },
+                  {
+                    backgroundColor: theme.accent,
+                    opacity: cursorAnim,
+                  },
                 ]}
               />
             </View>
           </View>
 
           {/* Payment Method */}
-          <TouchableOpacity
-            style={styles.paymentSelector}
-            activeOpacity={0.7}
-          >
+          <View style={[styles.paymentSelector, { borderBottomColor: theme.borderSubtle }]}>
             <View style={styles.paymentLeft}>
-              <CreditCard size={22} color={Colors.onSurfaceVariant} />
-              <Text style={styles.paymentText}>Cash</Text>
+              <CreditCard size={20} color={theme.textSecondary} />
+              <Text style={[styles.paymentText, { color: theme.textPrimary }]}>
+                Espèces (Cash à l'artisan)
+              </Text>
             </View>
-            <ChevronRight size={22} color={Colors.onSurfaceVariant} />
-          </TouchableOpacity>
+            <ChevronRight size={18} color={theme.textSecondary} />
+          </View>
 
           {/* Service Type Toggles */}
           <View style={styles.pillRow}>
             <TouchableOpacity
               style={[
                 styles.pill,
-                selectedTypes.includes('intervention') && styles.pillSelected,
+                {
+                  backgroundColor: selectedTypes.includes('intervention')
+                    ? (theme.accentMuted || 'rgba(235, 67, 28, 0.15)')
+                    : theme.surface,
+                  borderColor: selectedTypes.includes('intervention')
+                    ? theme.accent
+                    : theme.border,
+                },
               ]}
               onPress={() => toggleType('intervention')}
               activeOpacity={0.7}
             >
               {selectedTypes.includes('intervention') && (
-                <Check size={16} color={Colors.accent} />
+                <Check size={16} color={theme.accent} />
               )}
-              <Text style={styles.pillText}>Intervention à domicile</Text>
+              <Text
+                style={[
+                  styles.pillText,
+                  {
+                    color: selectedTypes.includes('intervention')
+                      ? theme.accent
+                      : theme.textSecondary,
+                  },
+                ]}
+              >
+                Intervention à domicile
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={[
                 styles.pill,
-                selectedTypes.includes('devis') && styles.pillSelected,
+                {
+                  backgroundColor: selectedTypes.includes('devis')
+                    ? (theme.accentMuted || 'rgba(235, 67, 28, 0.15)')
+                    : theme.surface,
+                  borderColor: selectedTypes.includes('devis')
+                    ? theme.accent
+                    : theme.border,
+                },
               ]}
               onPress={() => toggleType('devis')}
               activeOpacity={0.7}
             >
               {selectedTypes.includes('devis') && (
-                <Check size={16} color={Colors.accent} />
+                <Check size={16} color={theme.accent} />
               )}
-              <Text style={styles.pillText}>Devis à distance</Text>
+              <Text
+                style={[
+                  styles.pillText,
+                  {
+                    color: selectedTypes.includes('devis')
+                      ? theme.accent
+                      : theme.textSecondary,
+                  },
+                ]}
+              >
+                Devis préalable
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Material Toggle */}
-          <View style={styles.materialRow}>
+          <View style={[styles.materialRow, { borderBottomColor: theme.borderSubtle }]}>
             <View style={styles.materialLeft}>
-              <Wrench size={22} color={Colors.onSurfaceVariant} />
+              <Wrench size={20} color={theme.textSecondary} />
               <View style={styles.materialTextContainer}>
-                <Text style={styles.materialTitle}>
-                  Le prestataire apporte le matériel
+                <Text style={[styles.materialTitle, { color: theme.textPrimary }]}>
+                  L'artisan apporte le matériel
                 </Text>
-                <Text style={styles.materialSubtitle}>
-                  Matériel inclus dans le prix
+                <Text style={[styles.materialSubtitle, { color: theme.textSecondary }]}>
+                  Matériel et pièces inclus
                 </Text>
               </View>
             </View>
@@ -190,24 +241,19 @@ const PriceProposalScreen = ({ navigation }) => {
               value={materialIncluded}
               onValueChange={setMaterialIncluded}
               trackColor={{
-                false: Colors.surfaceVariant,
-                true: Colors.accent,
+                false: theme.surfaceElevated || '#333333',
+                true: theme.accent,
               }}
-              thumbColor={
-                materialIncluded ? Colors.white : Colors.outline
-              }
+              thumbColor="#FFFFFF"
             />
           </View>
 
           {/* Confirm Button */}
           <PrimaryButton
-            title="Confirmer"
-            onPress={() => navigation && navigation.goBack()}
+            title={`Confirmer (${price || 0} DH)`}
+            onPress={handleConfirm}
             disabled={!isConfirmEnabled}
-            style={[
-              styles.confirmBtn,
-              !isConfirmEnabled && styles.confirmBtnDisabled,
-            ]}
+            style={styles.confirmBtn}
           />
         </View>
 
@@ -225,106 +271,84 @@ const PriceProposalScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   mapBg: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.mapNavy,
   },
   mapDim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: `${Colors.background}A0`,
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
   sheet: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.82,
-    backgroundColor: '#1E1E1E',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 40,
-    elevation: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: 1,
+    paddingBottom: 24,
   },
   handleRow: {
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 4,
+    paddingVertical: 10,
   },
   handle: {
-    width: 48,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.surfaceVariant,
+    width: 44,
+    height: 4,
+    borderRadius: 2,
   },
   sheetContent: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 32,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    lineHeight: 32,
-    color: Colors.onSurface,
+    fontSize: 18,
+    fontWeight: '700',
   },
   closeBtn: {
-    padding: 8,
-    marginRight: -8,
+    padding: 4,
   },
   priceContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 12,
-    marginBottom: 32,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceVariant,
-    paddingBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    gap: 8,
   },
   currencyLabel: {
-    fontSize: 18,
-    fontWeight: '400',
-    lineHeight: 28,
-    color: Colors.onSurfaceVariant,
-    marginBottom: 4,
+    fontSize: 20,
+    fontWeight: '700',
   },
   priceInputRow: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
   priceValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    lineHeight: 40,
-    color: Colors.onSurface,
+    fontSize: 40,
+    fontWeight: '800',
+    letterSpacing: -1,
   },
   cursor: {
-    width: 2,
-    height: 32,
-    backgroundColor: Colors.accent,
-    marginLeft: 2,
+    width: 3,
+    height: 36,
+    marginLeft: 4,
+    borderRadius: 2,
   },
   paymentSelector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.surfaceContainer,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginBottom: 24,
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
   },
   paymentLeft: {
     flexDirection: 'row',
@@ -332,75 +356,56 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   paymentText: {
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: Colors.onSurface,
+    fontSize: 14,
+    fontWeight: '500',
   },
   pillRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 32,
+    gap: 10,
+    marginVertical: 14,
   },
   pill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 8,
-    borderRadius: 9999,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.outlineVariant,
-    backgroundColor: Colors.transparent,
-  },
-  pillSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accentSubtle,
+    gap: 6,
   },
   pillText: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.5,
-    lineHeight: 16,
-    color: Colors.onSurface,
   },
   materialRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 32,
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+    marginBottom: 16,
   },
   materialLeft: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 12,
     flex: 1,
   },
   materialTextContainer: {
+    gap: 2,
     flex: 1,
-    gap: 4,
   },
   materialTitle: {
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: Colors.onSurface,
+    fontSize: 13,
+    fontWeight: '600',
   },
   materialSubtitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    lineHeight: 16,
-    color: Colors.onSurfaceVariant,
+    fontSize: 11,
   },
   confirmBtn: {
     borderRadius: 12,
-  },
-  confirmBtnDisabled: {
-    backgroundColor: Colors.surfaceContainerHigh,
-    opacity: 0.5,
   },
 });
 

@@ -1,4 +1,4 @@
-// File: src/screens/main/MapHomeScreen.js
+// File: src/features/home/screens/MapHomeScreen.js
 import React, { useRef } from 'react';
 import {
   View,
@@ -17,10 +17,14 @@ import {
   Zap,
   Paintbrush,
   Star,
+  Crosshair,
 } from 'lucide-react-native';
+import { useTheme } from '../../../core/theme';
+import { ROUTES } from '../../../app/navigation/routes';
 import BottomSheetContainer from '../../../shared/components/ui/BottomSheetContainer';
-import useMapStore from '../../home/store/useMapStore';
-import useLocationStore from '../../home/store/useLocationStore';
+import useMapStore from '../store/useMapStore';
+import useLocationStore from '../store/useLocationStore';
+import { useBookingStore } from '../../booking/store/useBookingStore';
 
 /**
  * Custom dark map style for Google Maps & Apple Maps
@@ -78,9 +82,6 @@ const INITIAL_REGION = {
   longitudeDelta: 0.04,
 };
 
-/**
- * Helper to get icon component based on provider category
- */
 const getCategoryIcon = (category) => {
   switch (category) {
     case 'Électricité':
@@ -95,12 +96,13 @@ const getCategoryIcon = (category) => {
 
 const MapHomeScreen = ({ navigation }) => {
   const mapRef = useRef(null);
+  const { theme } = useTheme();
 
   const selectedCategory = useMapStore((state) => state.selectedCategory);
   const providers = useMapStore((state) => state.providers);
   const userLocation = useLocationStore((state) => state.userLocation);
+  const { updateDraft } = useBookingStore();
 
-  // Dynamic filtering of providers
   const filteredProviders =
     selectedCategory === 'All'
       ? providers
@@ -108,14 +110,12 @@ const MapHomeScreen = ({ navigation }) => {
 
   const initialLocation = userLocation || INITIAL_REGION;
 
-  /**
-   * Geocode a Moroccan city and animate MapView camera
-   */
   const handleSearchCity = async (cityName) => {
     try {
-      const query = cityName.toLowerCase().includes('morocco') || cityName.toLowerCase().includes('maroc')
-        ? cityName
-        : `${cityName}, Morocco`;
+      const query =
+        cityName.toLowerCase().includes('morocco') || cityName.toLowerCase().includes('maroc')
+          ? cityName
+          : `${cityName}, Morocco`;
 
       const results = await Location.geocodeAsync(query);
 
@@ -146,11 +146,39 @@ const MapHomeScreen = ({ navigation }) => {
   };
 
   const handleSelectAddress = (address) => {
-    navigation && navigation.navigate('ProviderDetails', { address: address.name });
+    updateDraft({ address: address.name });
+    if (navigation) {
+      navigation.navigate(ROUTES.PROVIDER_DETAILS, { address: address.name });
+    }
+  };
+
+  const handleSelectProvider = (provider) => {
+    updateDraft({
+      category: provider.category,
+      providerId: provider.id,
+      address: 'Intervention à proximité',
+    });
+    if (navigation) {
+      navigation.navigate(ROUTES.PROVIDER_DETAILS, { provider });
+    }
+  };
+
+  const handleCenterOnUser = () => {
+    if (userLocation && mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        800
+      );
+    }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* Live Interactive Map */}
@@ -181,28 +209,32 @@ const MapHomeScreen = ({ navigation }) => {
             >
               {/* Custom Marker Pin */}
               <View style={styles.markerContainer}>
-                <View style={styles.markerCircle}>
+                <View style={[styles.markerCircle, { backgroundColor: theme.accent }]}>
                   <IconComponent size={16} color="#FFFFFF" />
                 </View>
-                <View style={styles.markerTriangle} />
+                <View style={[styles.markerTriangle, { borderTopColor: theme.accent }]} />
               </View>
 
               {/* Callout Popup */}
-              <Callout
-                tooltip
-                onPress={() =>
-                  navigation &&
-                  navigation.navigate('ProviderDetails', { provider })
-                }
-              >
-                <View style={styles.calloutCard}>
-                  <Text style={styles.calloutName}>{provider.name}</Text>
-                  <Text style={styles.calloutCategory}>
+              <Callout tooltip onPress={() => handleSelectProvider(provider)}>
+                <View
+                  style={[
+                    styles.calloutCard,
+                    {
+                      backgroundColor: theme.surfaceElevated || '#212121',
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.calloutName, { color: theme.textPrimary }]}>
+                    {provider.name}
+                  </Text>
+                  <Text style={[styles.calloutCategory, { color: theme.textSecondary }]}>
                     {provider.category} • {provider.price}
                   </Text>
                   <View style={styles.calloutRating}>
-                    <Star size={12} color="#FF6B00" fill="#FF6B00" />
-                    <Text style={styles.calloutRatingText}>
+                    <Star size={12} color="#FFB300" fill="#FFB300" />
+                    <Text style={[styles.calloutRatingText, { color: theme.accent }]}>
                       {provider.rating} ({provider.reviewsCount} avis)
                     </Text>
                   </View>
@@ -215,20 +247,45 @@ const MapHomeScreen = ({ navigation }) => {
 
       {/* Floating UI Overlays */}
       <View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'box-none' }]}>
-        {/* Hamburger Menu Button */}
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => navigation && navigation.navigate('MenuDrawer')}
-          activeOpacity={0.85}
-        >
-          <Menu size={22} color="#FFFFFF" />
-        </TouchableOpacity>
+        {/* Top Controls */}
+        <View style={styles.topRow}>
+          {/* Hamburger Menu Button */}
+          <TouchableOpacity
+            style={[
+              styles.floatingBtn,
+              {
+                backgroundColor: theme.surfaceElevated || '#212121',
+                borderColor: theme.border,
+              },
+            ]}
+            onPress={() => navigation && navigation.navigate(ROUTES.MENU_DRAWER)}
+            activeOpacity={0.85}
+          >
+            <Menu size={22} color={theme.textPrimary} />
+          </TouchableOpacity>
+
+          {/* Center GPS Button */}
+          <TouchableOpacity
+            style={[
+              styles.floatingBtn,
+              {
+                backgroundColor: theme.surfaceElevated || '#212121',
+                borderColor: theme.border,
+              },
+            ]}
+            onPress={handleCenterOnUser}
+            activeOpacity={0.85}
+          >
+            <Crosshair size={20} color={theme.textPrimary} />
+          </TouchableOpacity>
+        </View>
 
         {/* Bottom Sheet Section */}
         <View style={styles.bottomSheetWrapper}>
           <BottomSheetContainer
             onSearchCity={handleSearchCity}
             onSelectAddress={handleSelectAddress}
+            onSearchPress={() => navigation && navigation.navigate(ROUTES.SEARCH_SERVICE)}
           />
         </View>
       </View>
@@ -239,26 +296,29 @@ const MapHomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
   },
-  menuButton: {
+  topRow: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 56 : 48,
     left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 10,
+    pointerEvents: 'box-none',
+  },
+  floatingBtn: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#212121',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#333333',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 6,
-    zIndex: 10,
   },
   markerContainer: {
     alignItems: 'center',
@@ -267,7 +327,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FF6B00',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -288,16 +347,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 6,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#FF6B00',
     alignSelf: 'center',
     marginTop: -1,
   },
   calloutCard: {
-    backgroundColor: '#212121',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#383838',
     width: 180,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
@@ -308,12 +364,10 @@ const styles = StyleSheet.create({
   calloutName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
     marginBottom: 2,
   },
   calloutCategory: {
     fontSize: 12,
-    color: '#B0B0B0',
     marginBottom: 4,
   },
   calloutRating: {
@@ -323,7 +377,6 @@ const styles = StyleSheet.create({
   },
   calloutRatingText: {
     fontSize: 11,
-    color: '#FF6B00',
     fontWeight: '600',
   },
   bottomSheetWrapper: {

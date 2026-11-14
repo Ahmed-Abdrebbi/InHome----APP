@@ -1,4 +1,4 @@
-// File: src/screens/main/MenuDrawerScreen.js
+// File: src/features/home/screens/MenuDrawerScreen.js
 import React from 'react';
 import {
   View,
@@ -12,36 +12,41 @@ import {
 import {
   FileText,
   Clock,
-  Bookmark,
   MapPin,
   Bell,
-  Shield,
   Settings,
   Info,
-  MessageCircle,
   ChevronRight,
   Star,
-  Camera,
-  Music,
-  Users,
+  Sparkles,
+  Briefcase,
+  User,
+  LogOut,
 } from 'lucide-react-native';
-import Colors from '../../../core/theme/legacyColors';
+import { useTheme } from '../../../core/theme';
+import { ROUTES } from '../../../app/navigation/routes';
+import { useAuthStore } from '../../auth/store/useAuthStore';
+import { useSettingsStore } from '../../account/store/useSettingsStore';
 import PrimaryButton from '../../../shared/components/ui/PrimaryButton';
 
 const { width } = Dimensions.get('window');
 
 const MenuDrawerScreen = ({ navigation }) => {
+  const { theme, tokens } = useTheme();
+  const { user, logout } = useAuthStore();
+  const { activeMode, setActiveMode } = useSettingsStore();
+
+  const isWorker = user?.role === 'worker' || activeMode === 'worker';
+
   const menuItems = [
-    { icon: FileText, label: 'Mes demandes', key: 'requests' },
-    { icon: Clock, label: 'Historique', key: 'history' },
-    { icon: Bookmark, label: 'Prestataires favoris', key: 'favorites' },
-    { icon: MapPin, label: 'Adresses enregistrées', key: 'addresses' },
-    { icon: Bell, label: 'Notifications', key: 'notifications' },
+    { icon: Sparkles, label: 'Assistant IA (Diagnostic)', route: ROUTES.AI_CHAT_ASSISTANT, highlight: true },
+    { icon: FileText, label: 'Mes demandes', route: ROUTES.HISTORY },
+    { icon: Clock, label: 'Historique des interventions', route: ROUTES.HISTORY },
+    { icon: MapPin, label: 'Adresses enregistrées', route: ROUTES.SAVED_ADDRESSES },
+    { icon: Bell, label: 'Notifications', route: ROUTES.NOTIFICATIONS },
     { divider: true },
-    { icon: Shield, label: 'Sécurité', key: 'security' },
-    { icon: Settings, label: 'Paramètres', key: 'settings' },
-    { icon: Info, label: 'Aide', key: 'help' },
-    { icon: MessageCircle, label: 'Support', key: 'support' },
+    { icon: Settings, label: 'Paramètres', route: ROUTES.SETTINGS },
+    { icon: Info, label: 'Aide & Support', route: ROUTES.HELP },
   ];
 
   const handleClose = () => {
@@ -50,88 +55,145 @@ const MenuDrawerScreen = ({ navigation }) => {
     }
   };
 
+  const handleNavigate = (route) => {
+    if (navigation && route) {
+      navigation.navigate(route);
+    }
+  };
+
+  const handleModeSwitch = () => {
+    if (isWorker) {
+      // Toggle back to client mode
+      setActiveMode('client');
+      navigation.navigate(ROUTES.MAP_HOME);
+    } else {
+      // Onboard worker or switch to worker mode
+      if (user?.role === 'worker') {
+        setActiveMode('worker');
+        navigation.navigate(ROUTES.WORKER_HOME);
+      } else {
+        navigation.navigate(ROUTES.WORKER_ONBOARDING);
+      }
+    }
+  };
+
+  const handleDevMenuLongPress = () => {
+    if (navigation) {
+      navigation.navigate(ROUTES.DEV_MENU);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* Drawer Panel */}
-      <View style={styles.drawer}>
+      <View
+        style={[
+          styles.drawer,
+          {
+            backgroundColor: theme.surfaceElevated || '#1A1D24',
+            borderRightColor: theme.border,
+          },
+        ]}
+      >
         {/* Profile Header */}
         <TouchableOpacity
-          style={styles.profileHeader}
+          style={[styles.profileHeader, { borderBottomColor: theme.borderSubtle }]}
           activeOpacity={0.7}
+          onPress={() => handleNavigate(ROUTES.PROFILE)}
+          onLongPress={handleDevMenuLongPress}
+          delayLongPress={600}
         >
           <View style={styles.profileLeft}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>A</Text>
+            <View
+              style={[
+                styles.avatar,
+                {
+                  backgroundColor: theme.accentMuted || '#332018',
+                  borderColor: theme.accent,
+                },
+              ]}
+            >
+              <Text style={[styles.avatarText, { color: theme.accent }]}>
+                {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
+              </Text>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>Ahmed</Text>
+              <Text style={[styles.profileName, { color: theme.textPrimary }]}>
+                {user?.fullName || 'Utilisateur'}
+              </Text>
               <View style={styles.ratingRow}>
-                <Star
-                  size={14}
-                  color={Colors.accent}
-                  fill={Colors.accent}
-                />
-                <Text style={styles.ratingText}>5,0</Text>
+                <Star size={14} color="#FFB300" fill="#FFB300" />
+                <Text style={[styles.ratingText, { color: theme.accent }]}>
+                  {user?.rating ? user.rating.toFixed(1) : '5.0'}
+                </Text>
+                <Text style={{ fontSize: 11, color: theme.textSecondary, marginLeft: 4 }}>
+                  ({activeMode === 'worker' ? 'Prestataire' : 'Client'})
+                </Text>
               </View>
             </View>
           </View>
-          <ChevronRight size={20} color={Colors.outline} />
+          <ChevronRight size={20} color={theme.textSecondary} />
         </TouchableOpacity>
 
         {/* Menu Items */}
-        <ScrollView
-          style={styles.menuList}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView style={styles.menuList} showsVerticalScrollIndicator={false}>
           {menuItems.map((item, index) => {
             if (item.divider) {
               return (
-                <View key={`divider-${index}`} style={styles.divider} />
+                <View
+                  key={`divider-${index}`}
+                  style={[styles.divider, { backgroundColor: theme.borderSubtle }]}
+                />
               );
             }
 
             const IconComponent = item.icon;
+            const iconColor = item.highlight ? theme.accent : theme.textSecondary;
+
             return (
               <TouchableOpacity
-                key={item.key}
+                key={item.label}
                 style={styles.menuItem}
                 activeOpacity={0.6}
+                onPress={() => handleNavigate(item.route)}
               >
-                <IconComponent
-                  size={22}
-                  color={Colors.outline}
-                />
-                <Text style={styles.menuItemText}>{item.label}</Text>
+                <IconComponent size={22} color={iconColor} />
+                <Text
+                  style={[
+                    styles.menuItemText,
+                    {
+                      color: item.highlight ? theme.accent : theme.textPrimary,
+                      fontWeight: item.highlight ? '600' : '400',
+                    },
+                  ]}
+                >
+                  {item.label}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
         {/* Bottom Section */}
-        <View style={styles.bottomSection}>
+        <View style={[styles.bottomSection, { borderTopColor: theme.borderSubtle }]}>
           <PrimaryButton
-            title="Devenir prestataire"
-            onPress={() => {}}
+            title={isWorker ? 'Passer en mode Client' : 'Devenir prestataire'}
+            onPress={handleModeSwitch}
             style={styles.providerBtn}
           />
 
-          {/* Social Icons */}
-          <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialBtn}>
-              <MessageCircle size={22} color={Colors.outline} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialBtn}>
-              <Camera size={22} color={Colors.outline} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialBtn}>
-              <Users size={22} color={Colors.outline} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialBtn}>
-              <Music size={22} color={Colors.outline} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            onPress={async () => {
+              await logout();
+              handleClose();
+            }}
+          >
+            <LogOut size={16} color={theme.textSecondary} />
+            <Text style={[styles.logoutText, { color: theme.textSecondary }]}>Déconnexion</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -151,59 +213,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: Colors.transparent,
+    backgroundColor: 'transparent',
   },
   drawer: {
-    width: width * 0.8,
+    width: width * 0.82,
     maxWidth: 380,
     height: '100%',
-    backgroundColor: Colors.primaryContainer,
-    shadowColor: Colors.black,
+    shadowColor: '#000000',
     shadowOffset: { width: 4, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 20,
     borderRightWidth: 1,
-    borderRightColor: Colors.surfaceContainerHigh,
   },
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingTop: 56,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceContainerHigh,
   },
   profileLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.surfaceContainerHighest,
     borderWidth: 2,
-    borderColor: Colors.surfaceContainerHighest,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.onSurface,
   },
   profileInfo: {
     gap: 2,
   },
   profileName: {
-    fontSize: 18,
-    fontWeight: '400',
-    lineHeight: 28,
-    color: Colors.onBackground,
+    fontSize: 17,
+    fontWeight: '600',
   },
   ratingRow: {
     flexDirection: 'row',
@@ -213,60 +267,51 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.5,
-    color: Colors.accent,
   },
   menuList: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: 12,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 14,
   },
   menuItemText: {
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: Colors.onBackground,
+    fontSize: 15,
   },
   divider: {
     marginVertical: 8,
-    marginHorizontal: 24,
+    marginHorizontal: 20,
     height: 1,
-    backgroundColor: Colors.surfaceContainerHigh,
   },
   bottomSection: {
-    paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderTopWidth: 1,
-    borderTopColor: Colors.surfaceContainerHigh,
-    gap: 24,
+    gap: 14,
   },
   providerBtn: {
     borderRadius: 12,
   },
-  socialRow: {
+  logoutBtn: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 24,
-  },
-  socialBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  logoutText: {
+    fontSize: 13,
   },
   closeOverlay: {
     flex: 1,
   },
   dimOverlay: {
     flex: 1,
-    backgroundColor: `${Colors.black}99`,
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
 });
 

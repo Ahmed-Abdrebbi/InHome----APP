@@ -1,4 +1,4 @@
-// File: src/screens/onboarding/WelcomeScreen.js
+// File: src/features/onboarding/screens/WelcomeScreen.js
 import React from 'react';
 import {
   View,
@@ -8,30 +8,29 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Home } from 'lucide-react-native';
-import Colors from '../../../core/theme/legacyColors';
+import { useTheme } from '../../../core/theme';
+import { ROUTES } from '../../../app/navigation/routes';
 
-/**
- * WelcomeScreen UI
- * First slide in the onboarding flow featuring Stitch dark theme & #FF6B00 accents.
- */
 const WelcomeScreen = ({ navigation }) => {
+  const { theme } = useTheme();
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#212121" />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle="light-content" backgroundColor={theme.background} />
 
       {/* Main content */}
       <View style={styles.mainContent}>
         <View style={styles.brandingBadge}>
-          <Home size={36} color="#FF6B00" />
-          <Text style={styles.brandName}>InHome</Text>
+          <Home size={38} color={theme.accent} />
+          <Text style={[styles.brandName, { color: theme.textPrimary }]}>InHome</Text>
         </View>
 
         <View style={styles.textContainer}>
-          <Text style={styles.headline}>
-            Le bon prestataire,{'\n'}près de chez vous.
+          <Text style={[styles.headline, { color: theme.accent }]}>
+            Le bon artisan,{'\n'}près de chez vous.
           </Text>
-          <Text style={styles.subtitle}>
-            Trouvez l'expert idéal en un clin d'œil pour tous vos travaux et interventions à domicile.
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Trouvez l'expert idéal au Maroc en un clin d'œil : plomberie, électricité, peinture, climatisation et plus.
           </Text>
         </View>
       </View>
@@ -40,14 +39,14 @@ const WelcomeScreen = ({ navigation }) => {
       <View style={styles.footer}>
         {/* Pagination indicators */}
         <View style={styles.pagination}>
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
+          <View style={[styles.dot, styles.dotActive, { backgroundColor: theme.accent }]} />
+          <View style={[styles.dot, { backgroundColor: theme.borderSubtle }]} />
         </View>
 
         {/* Primary Action Button */}
         <TouchableOpacity
-          style={styles.nextButton}
-          onPress={() => navigation && navigation.navigate('LocationPermission')}
+          style={[styles.nextButton, { backgroundColor: theme.accent }]}
+          onPress={() => navigation && navigation.navigate(ROUTES.LOCATION_PERMISSION)}
           activeOpacity={0.85}
         >
           <Text style={styles.nextButtonText}>Suivant</Text>
@@ -60,10 +59,9 @@ const WelcomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#212121',
     paddingHorizontal: 24,
     justifyContent: 'space-between',
-    paddingTop: 60,
+    paddingTop: 80,
     paddingBottom: 40,
   },
   mainContent: {
@@ -79,7 +77,6 @@ const styles = StyleSheet.create({
   brandName: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#FFFFFF',
     letterSpacing: -0.5,
   },
   textContainer: {
@@ -91,51 +88,37 @@ const styles = StyleSheet.create({
     fontSize: 32,
     lineHeight: 40,
     fontWeight: '700',
-    color: '#FF6B00',
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 24,
-    fontWeight: '400',
-    color: '#B0B0B0',
     textAlign: 'center',
   },
   footer: {
-    width: '100%',
-    alignItems: 'center',
     gap: 24,
   },
   pagination: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#424242',
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#FF6B00',
   },
   nextButton: {
-    width: '100%',
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#FF6B00',
+    height: 52,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF6B00',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   nextButtonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
   },

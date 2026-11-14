@@ -1,4 +1,4 @@
-// File: src/screens/onboarding/LocationPermissionScreen.js
+// File: src/features/onboarding/screens/LocationPermissionScreen.js
 import React, { useState } from 'react';
 import {
   View,
@@ -10,18 +10,26 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { MapPin } from 'lucide-react-native';
+import { useTheme } from '../../../core/theme';
 import useLocationStore from '../../home/store/useLocationStore';
+import { useSettingsStore } from '../../account/store/useSettingsStore';
 
 /**
- * LocationPermissionScreen UI
- * Handles requesting GPS permissions or skipping to default coordinates (Fquih Ben Salah).
+ * LocationPermissionScreen
+ * Requests GPS permission and sets hasSeenOnboarding(true) to trigger RootNavigator transition.
  */
 const LocationPermissionScreen = ({ navigation }) => {
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
 
   const setLocation = useLocationStore((state) => state.setLocation);
   const setPermissionStatus = useLocationStore((state) => state.setPermissionStatus);
   const setDefaultLocation = useLocationStore((state) => state.setDefaultLocation);
+  const setHasSeenOnboarding = useSettingsStore((state) => state.setHasSeenOnboarding);
+
+  const finishOnboarding = async () => {
+    await setHasSeenOnboarding(true);
+  };
 
   const handleRequestPermission = async () => {
     if (loading) return;
@@ -38,40 +46,38 @@ const LocationPermissionScreen = ({ navigation }) => {
         };
         setLocation(coords);
         setPermissionStatus('granted');
-        navigation.replace('MapHome');
       } else {
         setDefaultLocation();
-        navigation.replace('MapHome');
       }
     } catch (error) {
       console.warn('Error requesting location:', error);
       setDefaultLocation();
-      navigation.replace('MapHome');
     } finally {
       setLoading(false);
+      await finishOnboarding();
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     setDefaultLocation();
-    navigation.replace('MapHome');
+    await finishOnboarding();
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#212121" />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* Main content */}
       <View style={styles.content}>
         {/* Centered MapPin Icon */}
-        <View style={styles.iconContainer}>
-          <MapPin size={48} color="#FF6B00" />
+        <View style={[styles.iconContainer, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}>
+          <MapPin size={48} color={theme.accent} />
         </View>
 
         {/* Header Title & Description */}
-        <Text style={styles.title}>Autoriser la localisation</Text>
-        <Text style={styles.description}>
-          Activez la géolocalisation pour découvrir les bricoleurs et prestataires qualifiés disponibles immédiatement autour de vous.
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Autoriser la localisation</Text>
+        <Text style={[styles.description, { color: theme.textSecondary }]}>
+          Activez la géolocalisation pour découvrir les artisans et prestataires qualifiés disponibles immédiatement autour de chez vous.
         </Text>
       </View>
 
@@ -79,7 +85,7 @@ const LocationPermissionScreen = ({ navigation }) => {
       <View style={styles.footer}>
         {/* Primary Button */}
         <TouchableOpacity
-          style={styles.primaryButton}
+          style={[styles.primaryButton, { backgroundColor: theme.accent }]}
           onPress={handleRequestPermission}
           disabled={loading}
           activeOpacity={0.85}
@@ -98,7 +104,7 @@ const LocationPermissionScreen = ({ navigation }) => {
           disabled={loading}
           activeOpacity={0.7}
         >
-          <Text style={styles.skipButtonText}>Ignorer</Text>
+          <Text style={[styles.skipButtonText, { color: theme.textSecondary }]}>Plus tard</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -108,60 +114,44 @@ const LocationPermissionScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#212121',
-    justifyContent: 'space-between',
     paddingHorizontal: 24,
+    justifyContent: 'space-between',
     paddingTop: 80,
     paddingBottom: 40,
   },
   content: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
+    gap: 24,
+    marginTop: 60,
   },
   iconContainer: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: 'rgba(255, 107, 0, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 32,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 0, 0.25)',
+    marginBottom: 8,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 16,
   },
   description: {
     fontSize: 15,
-    lineHeight: 24,
-    color: '#9E9E9E',
+    lineHeight: 22,
     textAlign: 'center',
-    paddingHorizontal: 8,
+    maxWidth: 320,
   },
   footer: {
-    width: '100%',
     gap: 16,
-    alignItems: 'center',
   },
   primaryButton: {
-    width: '100%',
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#FF6B00',
+    height: 52,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF6B00',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   primaryButtonText: {
     fontSize: 16,
@@ -169,13 +159,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   skipButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   skipButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#9E9E9E',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
 

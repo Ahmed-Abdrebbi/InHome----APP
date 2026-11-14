@@ -1,4 +1,4 @@
-// File: src/components/UI/BottomSheetContainer.js
+// File: src/shared/components/ui/BottomSheetContainer.js
 import React, { useState } from 'react';
 import {
   View,
@@ -16,7 +16,7 @@ import {
   Clock,
   ChevronRight,
 } from 'lucide-react-native';
-import Colors from '../../../core/theme/legacyColors';
+import { useTheme } from '../../../core/theme';
 import useMapStore from '../../../features/home/store/useMapStore';
 
 const CATEGORIES = [
@@ -33,14 +33,16 @@ const RECENT_ADDRESSES = [
 /**
  * BottomSheetContainer matching the Stitch design:
  *  - Top drag handle
- *  - Search input with magnifying glass for Moroccan city search
- *  - Horizontal category selector pills with active orange highlight (#FF6B00)
+ *  - Search input with magnifying glass for Moroccan city search or direct service search
+ *  - Horizontal category selector pills with active accent highlight
  *  - Recent addresses list with Clock icons
  */
 const BottomSheetContainer = ({
   onSearchCity,
   onSelectAddress,
+  onSearchPress,
 }) => {
+  const { theme, tokens } = useTheme();
   const [searchText, setSearchText] = useState('');
   const selectedCategory = useMapStore((state) => state.selectedCategory);
   const setSelectedCategory = useMapStore((state) => state.setSelectedCategory);
@@ -60,35 +62,58 @@ const BottomSheetContainer = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.surfaceElevated || '#212121',
+          borderTopColor: theme.border,
+        },
+      ]}
+    >
       {/* Handle */}
       <View style={styles.handleContainer}>
-        <View style={styles.handle} />
+        <View style={[styles.handle, { backgroundColor: theme.borderSubtle || '#3E3E3E' }]} />
       </View>
 
       {/* Search Input Bar */}
-      <View style={styles.searchBar}>
-        <Search size={20} color="#9E9E9E" />
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => onSearchPress && onSearchPress()}
+        style={[
+          styles.searchBar,
+          {
+            backgroundColor: theme.surface || '#1A1D24',
+            borderColor: theme.border,
+          },
+        ]}
+      >
+        <Search size={20} color={theme.textSecondary || '#9E9E9E'} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: theme.textPrimary }]}
           placeholder="De quoi avez-vous besoin ? (ex: Casablanca)"
-          placeholderTextColor="#9E9E9E"
+          placeholderTextColor={theme.textSecondary || '#9E9E9E'}
           value={searchText}
           onChangeText={setSearchText}
           onSubmitEditing={handleSearchSubmit}
+          onFocus={() => {
+            if (onSearchPress) {
+              onSearchPress();
+            }
+          }}
           returnKeyType="search"
           autoCapitalize="words"
         />
         {searchText.trim().length > 0 && (
           <TouchableOpacity
-            style={styles.searchActionBtn}
+            style={[styles.searchActionBtn, { backgroundColor: theme.accent }]}
             onPress={handleSearchSubmit}
             activeOpacity={0.8}
           >
             <ChevronRight size={18} color="#FFFFFF" />
           </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
 
       {/* Categories Horizontal Scroll */}
       <ScrollView
@@ -104,19 +129,27 @@ const BottomSheetContainer = ({
               key={cat.id}
               style={[
                 styles.categoryPill,
-                isSelected && styles.categoryPillActive,
+                {
+                  backgroundColor: isSelected
+                    ? (theme.accentMuted || 'rgba(235, 67, 28, 0.15)')
+                    : (theme.surface || '#2C3038'),
+                  borderColor: isSelected ? theme.accent : theme.border,
+                },
               ]}
               onPress={() => handleCategoryPress(cat.id)}
               activeOpacity={0.7}
             >
               <Icon
                 size={16}
-                color={isSelected ? '#FF6B00' : '#E0E0E0'}
+                color={isSelected ? theme.accent : (theme.textSecondary || '#B0B0B0')}
               />
               <Text
                 style={[
                   styles.categoryText,
-                  isSelected && styles.categoryTextActive,
+                  {
+                    color: isSelected ? theme.accent : (theme.textPrimary || '#FFFFFF'),
+                    fontWeight: isSelected ? '700' : '500',
+                  },
                 ]}
               >
                 {cat.label}
@@ -128,22 +161,26 @@ const BottomSheetContainer = ({
 
       {/* Recent Addresses Section */}
       <View style={styles.recentSection}>
-        <Text style={styles.recentTitle}>ADRESSES RÉCENTES</Text>
+        <Text style={[styles.recentTitle, { color: theme.textSecondary || '#8A92A6' }]}>
+          ADRESSES RÉCENTES
+        </Text>
         {RECENT_ADDRESSES.map((addr) => (
           <TouchableOpacity
             key={addr.id}
-            style={styles.addressRow}
+            style={[styles.addressRow, { borderBottomColor: theme.borderSubtle }]}
             onPress={() => onSelectAddress && onSelectAddress(addr)}
             activeOpacity={0.7}
           >
-            <View style={styles.addressIconWrap}>
-              <Clock size={18} color="#9E9E9E" />
+            <View style={[styles.addressIconWrap, { backgroundColor: theme.surface }]}>
+              <Clock size={18} color={theme.textSecondary || '#9E9E9E'} />
             </View>
             <View style={styles.addressContent}>
-              <Text style={styles.addressName}>{addr.name}</Text>
-              <Text style={styles.addressSubtitle}>{addr.subtitle}</Text>
+              <Text style={[styles.addressName, { color: theme.textPrimary }]}>{addr.name}</Text>
+              <Text style={[styles.addressSubtitle, { color: theme.textSecondary }]}>
+                {addr.subtitle}
+              </Text>
             </View>
-            <ChevronRight size={18} color="#9E9E9E" />
+            <ChevronRight size={18} color={theme.textSecondary || '#9E9E9E'} />
           </TouchableOpacity>
         ))}
       </View>
@@ -153,13 +190,11 @@ const BottomSheetContainer = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#212121',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
     paddingBottom: 32,
     borderTopWidth: 1,
-    borderTopColor: '#2E2E2E',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.5,
@@ -174,31 +209,26 @@ const styles = StyleSheet.create({
     width: 44,
     height: 5,
     borderRadius: 3,
-    backgroundColor: '#424242',
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#181818',
     borderRadius: 14,
     paddingHorizontal: 14,
-    height: 50,
-    marginBottom: 16,
+    height: 48,
     borderWidth: 1,
-    borderColor: '#2E2E2E',
+    marginBottom: 16,
     gap: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
-    color: '#FFFFFF',
+    fontSize: 14,
     paddingVertical: 0,
   },
   searchActionBtn: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#FF6B00',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -212,61 +242,45 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: '#181818',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#333333',
-  },
-  categoryPillActive: {
-    borderColor: '#FF6B00',
-    backgroundColor: 'rgba(255, 107, 0, 0.15)',
   },
   categoryText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#E0E0E0',
-  },
-  categoryTextActive: {
-    color: '#FF6B00',
   },
   recentSection: {
-    marginTop: 4,
+    paddingTop: 8,
   },
   recentTitle: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#757575',
     letterSpacing: 1,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 14,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2C2C2C',
-    gap: 12,
+    borderBottomWidth: 0.5,
   },
   addressIconWrap: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#181818',
     alignItems: 'center',
     justifyContent: 'center',
   },
   addressContent: {
     flex: 1,
+    gap: 2,
   },
   addressName: {
     fontSize: 15,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    marginBottom: 2,
+    fontWeight: '600',
   },
   addressSubtitle: {
-    fontSize: 13,
-    color: '#9E9E9E',
+    fontSize: 12,
   },
 });
 

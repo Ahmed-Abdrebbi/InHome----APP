@@ -1,4 +1,4 @@
-// File: src/screens/ai/AIChatAssistantScreen.js
+// File: src/features/ai/screens/AIChatAssistantScreen.js
 import React, { useState, useRef } from 'react';
 import {
   View,
@@ -12,38 +12,26 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { ArrowLeft, Send, Bot, User } from 'lucide-react-native';
-import Colors from '../../../core/theme/legacyColors';
-import useChatStore from '../../ai/store/useAiChatStore';
+import { ArrowLeft, Send, Bot, User, Sparkles } from 'lucide-react-native';
+import { useTheme } from '../../../core/theme';
+import { useAiChatStore } from '../store/useAiChatStore';
 
 const AIChatAssistantScreen = ({ navigation }) => {
+  const { theme, tokens } = useTheme();
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef(null);
 
-  const messages = useChatStore((state) => state.messages);
-  const isTyping = useChatStore((state) => state.isTyping);
-  const addMessage = useChatStore((state) => state.addMessage);
-  const setIsTyping = useChatStore((state) => state.setIsTyping);
+  const { messages, isTyping, sendMessage } = useAiChatStore();
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
+  const handleSend = async () => {
+    if (!inputText.trim() || isTyping) return;
 
     const userContent = inputText.trim();
     setInputText('');
 
-    // Add user message to global store
-    addMessage({
-      role: 'user',
-      content: userContent,
-    });
-
-    // Indicate assistant is typing
-    setIsTyping(true);
-
-    // TODO: Implement SSE connection
+    await sendMessage(userContent);
 
     setTimeout(() => {
-      // Scroll to end when new messages arrive
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
   };
@@ -58,28 +46,30 @@ const AIChatAssistantScreen = ({ navigation }) => {
         ]}
       >
         {!isUser && (
-          <View style={styles.assistantAvatar}>
-            <Bot size={16} color={Colors.white} />
+          <View style={[styles.assistantAvatar, { backgroundColor: theme.surfaceElevated }]}>
+            <Bot size={16} color={theme.accent} />
           </View>
         )}
         <View
           style={[
             styles.bubble,
-            isUser ? styles.bubbleUser : styles.bubbleAssistant,
+            isUser
+              ? [styles.bubbleUser, { backgroundColor: theme.accent }]
+              : [styles.bubbleAssistant, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }],
           ]}
         >
           <Text
             style={[
               styles.messageText,
-              isUser ? styles.messageTextUser : styles.messageTextAssistant,
+              isUser ? styles.messageTextUser : [styles.messageTextAssistant, { color: theme.textPrimary }],
             ]}
           >
             {item.content}
           </Text>
         </View>
         {isUser && (
-          <View style={styles.userAvatar}>
-            <User size={16} color={Colors.white} />
+          <View style={[styles.userAvatar, { backgroundColor: theme.accent }]}>
+            <User size={16} color="#FFFFFF" />
           </View>
         )}
       </View>
@@ -88,24 +78,37 @@ const AIChatAssistantScreen = ({ navigation }) => {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-      <StatusBar barStyle="light-content" backgroundColor={Colors.surfaceContainer} />
+      <StatusBar barStyle="light-content" backgroundColor={theme.background} />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: theme.surfaceElevated,
+            borderBottomColor: theme.borderSubtle,
+          },
+        ]}
+      >
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation && navigation.goBack()}
           activeOpacity={0.7}
         >
-          <ArrowLeft size={24} color={Colors.onSurface} />
+          <ArrowLeft size={22} color={theme.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Assistant InHome AI</Text>
-          <Text style={styles.headerSubtitle}>Diagnostic & Devis instantané</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Sparkles size={16} color={theme.accent} />
+            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Assistant InHome AI</Text>
+          </View>
+          <Text style={[styles.headerSubtitle, { color: theme.accent }]}>
+            Diagnostic Darija/Français & Devis instantané
+          </Text>
         </View>
       </View>
 
@@ -120,12 +123,21 @@ const AIChatAssistantScreen = ({ navigation }) => {
         ListFooterComponent={
           isTyping ? (
             <View style={styles.typingIndicatorRow}>
-              <View style={styles.assistantAvatar}>
-                <Bot size={16} color={Colors.white} />
+              <View style={[styles.assistantAvatar, { backgroundColor: theme.surfaceElevated }]}>
+                <Bot size={16} color={theme.accent} />
               </View>
-              <View style={[styles.bubble, styles.bubbleAssistant, styles.typingBubble]}>
-                <ActivityIndicator size="small" color="#FF6B00" />
-                <Text style={styles.typingText}>L'assistant écrit...</Text>
+              <View
+                style={[
+                  styles.bubble,
+                  styles.bubbleAssistant,
+                  styles.typingBubble,
+                  { backgroundColor: theme.surfaceElevated, borderColor: theme.border },
+                ]}
+              >
+                <ActivityIndicator size="small" color={theme.accent} />
+                <Text style={[styles.typingText, { color: theme.textSecondary }]}>
+                  L'assistant réfléchit...
+                </Text>
               </View>
             </View>
           ) : null
@@ -133,31 +145,37 @@ const AIChatAssistantScreen = ({ navigation }) => {
       />
 
       {/* Input Area */}
-      <View style={styles.inputContainer}>
+      <View
+        style={[
+          styles.inputContainer,
+          {
+            backgroundColor: theme.surfaceElevated,
+            borderTopColor: theme.borderSubtle,
+          },
+        ]}
+      >
         <TextInput
-          style={styles.input}
-          placeholder="Décrivez votre besoin..."
-          placeholderTextColor={Colors.onSurfaceVariant}
+          style={[styles.input, { color: theme.textPrimary, backgroundColor: theme.surface }]}
+          placeholder="Décrivez votre problème en Darija ou Français..."
+          placeholderTextColor={theme.textSecondary}
           value={inputText}
           onChangeText={setInputText}
           multiline={false}
+          onSubmitEditing={handleSend}
+          returnKeyType="send"
         />
         <TouchableOpacity
           style={[
             styles.sendBtn,
-            inputText.trim().length > 0 && styles.sendBtnActive,
+            { backgroundColor: inputText.trim().length > 0 ? theme.accent : theme.surface },
           ]}
           onPress={handleSend}
-          disabled={!inputText.trim()}
+          disabled={!inputText.trim() || isTyping}
           activeOpacity={0.8}
         >
           <Send
-            size={20}
-            color={
-              inputText.trim().length > 0
-                ? Colors.white
-                : Colors.onSurfaceVariant
-            }
+            size={18}
+            color={inputText.trim().length > 0 ? '#FFFFFF' : theme.textSecondary}
           />
         </TouchableOpacity>
       </View>
@@ -168,23 +186,19 @@ const AIChatAssistantScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 16,
-    backgroundColor: Colors.surfaceContainer,
+    paddingTop: 52,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceContainerHigh,
     gap: 12,
   },
   backBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -192,13 +206,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.onSurface,
+    fontSize: 16,
+    fontWeight: '700',
   },
   headerSubtitle: {
-    fontSize: 12,
-    color: '#FF6B00',
+    fontSize: 11,
+    fontWeight: '600',
   },
   chatList: {
     padding: 16,
@@ -220,43 +233,39 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#333333',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   userAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FF6B00',
     alignItems: 'center',
     justifyContent: 'center',
   },
   bubble: {
-    maxWidth: '75%',
+    maxWidth: '78%',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 18,
   },
   bubbleUser: {
-    backgroundColor: '#FF6B00',
     borderBottomRightRadius: 4,
   },
   bubbleAssistant: {
-    backgroundColor: '#333333',
     borderBottomLeftRadius: 4,
+    borderWidth: 1,
   },
   messageText: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
   },
   messageTextUser: {
-    color: Colors.white,
-    fontWeight: '500',
+    color: '#FFFFFF',
   },
-  messageTextAssistant: {
-    color: Colors.onSurface,
-  },
+  messageTextAssistant: {},
   typingIndicatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -266,42 +275,35 @@ const styles = StyleSheet.create({
   typingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
   typingText: {
     fontSize: 13,
-    color: Colors.onSurfaceVariant,
-    fontStyle: 'italic',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.surfaceContainer,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.surfaceContainerHigh,
-    gap: 12,
+    gap: 10,
   },
   input: {
     flex: 1,
-    height: 48,
-    backgroundColor: Colors.surfaceContainerHigh,
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    fontSize: 15,
-    color: Colors.onSurface,
+    height: 44,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    fontSize: 14,
   },
   sendBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.surfaceContainerHigh,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sendBtnActive: {
-    backgroundColor: '#FF6B00',
   },
 });
 

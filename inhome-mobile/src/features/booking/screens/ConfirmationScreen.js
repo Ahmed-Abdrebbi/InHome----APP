@@ -1,4 +1,4 @@
-// File: src/screens/booking/ConfirmationScreen.js
+// File: src/features/booking/screens/ConfirmationScreen.js
 import React, { useState } from 'react';
 import {
   View,
@@ -7,160 +7,181 @@ import {
   StatusBar,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Wrench,
   Timer,
   Camera,
-  SlidersHorizontal,
+  ArrowLeft,
+  Check,
 } from 'lucide-react-native';
-import Colors from '../../../core/theme/legacyColors';
+import { useTheme } from '../../../core/theme';
+import { ROUTES } from '../../../app/navigation/routes';
+import { formatPrice } from '../../../core/utils/formatPrice';
+import { useBookingStore } from '../store/useBookingStore';
 import PrimaryButton from '../../../shared/components/ui/PrimaryButton';
 import ProviderInfoCard from '../../../shared/components/cards/ProviderInfoCard';
 
-/**
- * Booking confirmation screen matching the Stitch "Confirmation de rénovation" design.
- * Features:
- *  - Map background with pins
- *  - Floating info card (address + job scope)
- *  - Bottom sheet: quote options (3 tiers — selected highlighted)
- *  - "Trouver un prestataire" CTA + settings button
- */
 const ConfirmationScreen = ({ navigation }) => {
-  const [selectedTier, setSelectedTier] = useState(0);
+  const { theme, tokens } = useTheme();
+  const { draft, createBooking, loading, updateDraft } = useBookingStore();
+  const [selectedTierIndex, setSelectedTierIndex] = useState(0);
+
+  const basePrice = draft?.proposedPrice || 80;
+  const address = draft?.address || 'Av. Marrakech, Casablanca';
+  const category = draft?.category || 'Plomberie';
 
   const tiers = [
     {
-      id: 'full',
+      id: 'standard',
       icon: Wrench,
-      title: 'Devis complet',
-      subtitle: 'Visite + devis détaillé',
-      price: 'DH 350',
+      title: 'Intervention Standard',
+      subtitle: 'Artisan disponible sous 30-45 min',
+      price: basePrice,
     },
     {
-      id: 'express',
+      id: 'urgent',
       icon: Timer,
-      title: 'Devis express',
-      subtitle: 'Visite rapide',
-      price: 'DH 268',
+      title: 'Intervention Express',
+      subtitle: 'Prioritaire sous 15-20 min (+25%)',
+      price: Math.round(basePrice * 1.25),
     },
     {
-      id: 'remote',
+      id: 'devis',
       icon: Camera,
-      title: 'Devis à distance',
-      subtitle: 'Par photo/vidéo',
-      price: 'DH 100',
+      title: 'Devis préalable',
+      subtitle: 'Estimation gratuite avant travaux',
+      price: Math.min(basePrice, 40),
     },
   ];
 
+  const handleSelectTier = (index) => {
+    setSelectedTierIndex(index);
+    const tier = tiers[index];
+    updateDraft({
+      tier: tier.id,
+      proposedPrice: tier.price,
+    });
+  };
+
+  const handleConfirmBooking = async () => {
+    try {
+      const tier = tiers[selectedTierIndex];
+      const booking = await createBooking({
+        tier: tier.id,
+        proposedPrice: tier.price,
+      });
+
+      if (booking?.id) {
+        navigation.navigate(ROUTES.SEARCHING_RADAR, { bookingId: booking.id });
+      }
+    } catch (e) {
+      // In case of error
+      navigation.navigate(ROUTES.SEARCHING_RADAR);
+    }
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Map Background */}
-      <View style={styles.mapBg}>
-        <View style={styles.mapBase}>
-          {/* Grid pattern */}
-          <View style={styles.mapGrid}>
-            {Array.from({ length: 30 }).map((_, i) => (
-              <View key={`h-${i}`} style={[styles.gridLineH, { top: i * 30 }]} />
-            ))}
-            {Array.from({ length: 20 }).map((_, i) => (
-              <View key={`v-${i}`} style={[styles.gridLineV, { left: i * 25 }]} />
-            ))}
-          </View>
-
-          {/* Client pin */}
-          <View style={styles.clientPin}>
-            <View style={styles.clientPinHalo} />
-            <View style={styles.clientPinDot} />
-          </View>
-
-          {/* Supplier pin */}
-          <View style={styles.supplierPin}>
-            <View style={styles.supplierPinOuter}>
-              <View style={styles.supplierPinInner} />
-            </View>
-          </View>
-        </View>
+      {/* Top Header with Back Button */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={[styles.backBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}
+          onPress={() => navigation && navigation.goBack()}
+          activeOpacity={0.8}
+        >
+          <ArrowLeft size={20} color={theme.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[styles.topTitle, { color: theme.textPrimary }]}>Récapitulatif</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Floating Info Card */}
       <View style={styles.infoCardContainer}>
         <ProviderInfoCard
-          address="Av. Marrakech"
+          address={address}
           addressLabel="Adresse d'intervention"
-          jobTitle="Rénovation salle de bain"
-          jobEstimate="~2 jours estimés"
-          onEditPress={() => {}}
+          jobTitle={`Demande : ${category}`}
+          jobEstimate="Prix proposé par vous"
+          onEditPress={() => navigation && navigation.navigate(ROUTES.PRICE_PROPOSAL)}
         />
       </View>
 
-      {/* Spacer */}
-      <View style={{ flex: 1 }} />
-
       {/* Bottom Sheet */}
-      <View style={styles.bottomSheet}>
-        {/* Drag Handle */}
+      <View
+        style={[
+          styles.bottomSheet,
+          {
+            backgroundColor: theme.surfaceElevated || '#1E212A',
+            borderTopColor: theme.border,
+          },
+        ]}
+      >
         <View style={styles.handleContainer}>
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: theme.borderSubtle }]} />
         </View>
 
-        <Text style={styles.sheetTitle}>Options de devis</Text>
+        <Text style={[styles.sheetTitle, { color: theme.textPrimary }]}>Options d'intervention</Text>
 
-        {/* Tiers */}
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.tiersContainer}
-        >
+        {/* Tiers List */}
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.tiersContainer}>
           {tiers.map((tier, index) => {
             const IconComp = tier.icon;
-            const isSelected = selectedTier === index;
+            const isSelected = selectedTierIndex === index;
 
             return (
               <TouchableOpacity
                 key={tier.id}
                 style={[
                   styles.tierCard,
-                  isSelected && styles.tierCardSelected,
+                  {
+                    backgroundColor: isSelected
+                      ? (theme.accentMuted || 'rgba(235, 67, 28, 0.15)')
+                      : theme.surface,
+                    borderColor: isSelected ? theme.accent : theme.border,
+                  },
                 ]}
-                onPress={() => setSelectedTier(index)}
+                onPress={() => handleSelectTier(index)}
                 activeOpacity={0.7}
               >
-                {isSelected && <View style={styles.tierHighlight} />}
                 <View
                   style={[
                     styles.tierIcon,
-                    isSelected && styles.tierIconSelected,
+                    {
+                      backgroundColor: isSelected ? theme.accent : theme.surfaceElevated,
+                    },
                   ]}
                 >
-                  <IconComp
-                    size={22}
-                    color={
-                      isSelected
-                        ? Colors.secondaryContainer
-                        : Colors.primary
-                    }
-                  />
+                  <IconComp size={20} color={isSelected ? '#FFFFFF' : theme.textSecondary} />
                 </View>
                 <View style={styles.tierContent}>
                   <Text
                     style={[
                       styles.tierTitle,
-                      isSelected && styles.tierTitleSelected,
+                      {
+                        color: isSelected ? theme.accent : theme.textPrimary,
+                        fontWeight: isSelected ? '700' : '600',
+                      },
                     ]}
                   >
                     {tier.title}
                   </Text>
-                  <Text style={styles.tierSubtitle}>{tier.subtitle}</Text>
+                  <Text style={[styles.tierSubtitle, { color: theme.textSecondary }]}>
+                    {tier.subtitle}
+                  </Text>
                 </View>
                 <Text
                   style={[
                     styles.tierPrice,
-                    isSelected && styles.tierPriceSelected,
+                    {
+                      color: isSelected ? theme.accent : theme.textPrimary,
+                    },
                   ]}
                 >
-                  {tier.price}
+                  {formatPrice(tier.price)}
                 </Text>
               </TouchableOpacity>
             );
@@ -170,19 +191,11 @@ const ConfirmationScreen = ({ navigation }) => {
         {/* Footer Actions */}
         <View style={styles.footerActions}>
           <PrimaryButton
-            title="Trouver un prestataire"
-            onPress={() => navigation && navigation.navigate('MapHome')}
+            title={loading ? 'Publication de la demande...' : `Trouver un artisan (${formatPrice(tiers[selectedTierIndex].price)})`}
+            onPress={handleConfirmBooking}
+            disabled={loading}
             style={styles.findBtn}
           />
-          <TouchableOpacity
-            style={styles.settingsBtn}
-            activeOpacity={0.7}
-          >
-            <SlidersHorizontal
-              size={22}
-              color={Colors.onBackground}
-            />
-          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -192,208 +205,99 @@ const ConfirmationScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.surface,
   },
-  mapBg: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 0,
-  },
-  mapBase: {
-    flex: 1,
-    backgroundColor: Colors.mapBase,
-  },
-  mapGrid: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.06,
-  },
-  gridLineH: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: Colors.white,
-  },
-  gridLineV: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 1,
-    backgroundColor: Colors.white,
-  },
-  clientPin: {
-    position: 'absolute',
-    top: '35%',
-    left: '25%',
+  topBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clientPinHalo: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: `${Colors.onBackground}1A`,
-    position: 'absolute',
-  },
-  clientPinDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.onBackground,
-  },
-  supplierPin: {
-    position: 'absolute',
-    top: '55%',
-    right: '25%',
-  },
-  supplierPinOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    backgroundColor: Colors.surfaceVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  supplierPinInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.secondaryContainer,
-  },
-  infoCardContainer: {
-    position: 'relative',
-    zIndex: 10,
+    justifyContent: 'space-between',
     paddingTop: 52,
     paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  topTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  infoCardContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
   },
   bottomSheet: {
-    position: 'relative',
-    zIndex: 20,
-    backgroundColor: Colors.surfaceContainerLow,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingTop: 24,
-    paddingBottom: 32,
-    paddingHorizontal: 20,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 40,
-    elevation: 24,
-    borderTopWidth: 1,
-    borderTopColor: `${Colors.outlineVariant}4D`,
-  },
-  handleContainer: {
     position: 'absolute',
-    top: 12,
+    bottom: 0,
     left: 0,
     right: 0,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 34,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  handleContainer: {
     alignItems: 'center',
+    paddingVertical: 10,
   },
   handle: {
-    width: 48,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.outlineVariant,
+    width: 40,
+    height: 4,
+    borderRadius: 2,
   },
   sheetTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    lineHeight: 32,
-    color: Colors.onBackground,
-    marginBottom: 20,
-    paddingHorizontal: 4,
-    paddingTop: 8,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 14,
   },
   tiersContainer: {
-    gap: 12,
-    paddingBottom: 8,
+    gap: 10,
+    paddingBottom: 16,
   },
   tierCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.outlineVariant,
-    overflow: 'hidden',
-  },
-  tierCardSelected: {
-    backgroundColor: Colors.surfaceContainerHigh,
-    borderWidth: 2,
-    borderColor: Colors.secondaryContainer,
-  },
-  tierHighlight: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: `${Colors.secondaryContainer}0D`,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    gap: 12,
   },
   tierIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.surfaceContainerHighest,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  tierIconSelected: {
-    backgroundColor: `${Colors.secondaryContainer}33`,
   },
   tierContent: {
     flex: 1,
     gap: 2,
   },
   tierTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    lineHeight: 24,
-    color: Colors.onBackground,
-  },
-  tierTitleSelected: {
-    fontSize: 18,
-    fontWeight: '600',
-    lineHeight: 28,
+    fontSize: 14,
   },
   tierSubtitle: {
     fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    lineHeight: 16,
-    color: Colors.onSurfaceVariant,
   },
   tierPrice: {
     fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 24,
-    color: Colors.onBackground,
-  },
-  tierPriceSelected: {
-    fontSize: 18,
     fontWeight: '700',
-    lineHeight: 28,
   },
   footerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: `${Colors.outlineVariant}4D`,
+    paddingTop: 6,
   },
   findBtn: {
-    flex: 1,
     borderRadius: 12,
-  },
-  settingsBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: Colors.surfaceContainerHigh,
-    borderWidth: 1,
-    borderColor: Colors.outlineVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
 
