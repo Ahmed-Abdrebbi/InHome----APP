@@ -1,72 +1,41 @@
-// File: src/core/theme/tokens.js
-/**
- * Design Tokens invariables (espacements, bordures, typographie, ombres)
- */
-export const Spacing = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  xxxl: 32,
-  huge: 48,
-};
-
-export const Radius = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  full: 9999,
-};
-
-export const Typography = {
-  fontFamily: {
-    regular: 'System',
-    medium: 'System',
-    bold: 'System',
+export const tokens = {
+  fonts: {
+    regular: 'PlusJakartaSans_400Regular',
+    medium: 'PlusJakartaSans_500Medium',
+    semiBold: 'PlusJakartaSans_600SemiBold',
+    bold: 'PlusJakartaSans_700Bold',
   },
-  fontSize: {
-    xs: 11,
-    sm: 13,
-    base: 15,
+  typography: {
+    displayHero: { fontSize: 36, lineHeight: 44, fontWeight: '700' },
+    displayHeroMobile: { fontSize: 32, lineHeight: 40, fontWeight: '700' },
+    headlineLg: { fontSize: 28, lineHeight: 36, fontWeight: '700' },
+    headlineLgMobile: { fontSize: 24, lineHeight: 32, fontWeight: '700' },
+    headlineMd: { fontSize: 22, lineHeight: 28, fontWeight: '600' },
+    headlineMdMobile: { fontSize: 20, lineHeight: 26, fontWeight: '600' },
+    headlineSm: { fontSize: 18, lineHeight: 24, fontWeight: '600' },
+    bodyLg: { fontSize: 16, lineHeight: 24, fontWeight: '400' },
+    bodyMd: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
+    labelLg: { fontSize: 16, lineHeight: 20, fontWeight: '600' },
+    labelMd: { fontSize: 14, lineHeight: 18, fontWeight: '500' },
+    labelSm: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+    caption: { fontSize: 12, lineHeight: 16, fontWeight: '400' },
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
     md: 16,
-    lg: 18,
-    xl: 20,
-    xxl: 24,
-    display: 32,
-    giant: 40,
+    lg: 24,
+    xl: 32,
+    margin: 16,
+    gutter: 16,
   },
-  lineHeight: {
-    tight: 1.2,
-    normal: 1.4,
-    relaxed: 1.6,
+  radius: {
+    sm: 4,
+    lg: 8,
+    xl: 12,
+    iconTile: 28,
+    full: 9999,
   },
 };
 
-export const Shadows = {
-  card: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  elevated: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  modal: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-};
+export default tokens;
