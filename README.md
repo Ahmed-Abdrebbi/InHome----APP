@@ -160,16 +160,34 @@ Never commit your real `.env`. Keep an `.env.example` with empty values instead.
 
 ```mermaid
 graph TD
-    A[Splash] -->|2.5s| B[Welcome]
-    B -->|Continuer| C[Location permission]
-    C -->|Enable / Skip| D[Map home]
-    D -->|Menu| E[Drawer]
-    D -->|Search bar| F[Search service]
-    D -->|Tap provider| G[Provider details]
-    G -->|Price row| H[Price proposal]
-    G -->|CTA| I[Searching radar]
-    I --> J[Confirmation]
-    J -->|CTA| D
+    A[Splash Screen] -->|Hydratation & Auto-boot| B{Onboarding vu ?}
+    B -->|Non| C[Onboarding : Welcome & Location]
+    C -->|Terminé| D{Authentifié ?}
+    B -->|Oui| D
+    D -->|Non| E[AuthStack : Login / Register]
+    D -->|Oui| F{Mode Actif ?}
+    
+    subgraph ClientFlow [Mode Client]
+        F -->|Client| G[Map Home]
+        G -->|Menu| H[Drawer Menu / Profil]
+        G -->|Recherche / IA| I[Search Service + AI Match]
+        I --> J[Provider Details]
+        J -->|Proposer Prix| K[Price Proposal MAD]
+        K --> L[Confirmation & Tiers]
+        L --> M[Searching Radar]
+        M -->|Offres reçues| N[Offers List]
+        N -->|Accepter offre| O[Job Tracking GPS]
+        O -->|Terminé| P[Rating & Avis]
+        P --> G
+    end
+
+    subgraph WorkerFlow [Mode Prestataire]
+        F -->|Prestataire| W1[Worker Home & Demandes Proches]
+        W1 --> W2[Détails Demande]
+        W2 --> W3[Envoyer Offre / Contre-proposition]
+        W3 --> W4[Mission Active & Suivi]
+        W1 --> W5[Revenus & Portefeuille]
+    end
 ```
 
 ## Design system
@@ -203,18 +221,19 @@ Brand colors: Tomato `#EB431C`, Black Chocolate `#3A1202`, Kobe gradient `#8D2A1
 ## Roadmap
 
 - [x] Design tokens and reusable UI components
+- [x] 3-Layer feature-first architecture (`app/`, `core/`, `shared/`, `features/`)
 - [x] Onboarding, map home and booking flow screens (client)
-- [x] Backend skeleton: auth, booking, AI controllers, Prisma schema
-- [ ] Connect the mobile app to the real API (replace mock data)
-- [ ] Authentication screens (login / register / OTP)
-- [ ] Worker side: requests, counter-offers, availability
-- [ ] Real-time updates (WebSocket) for offers and job status
-- [ ] Ratings and reviews
-- [ ] Push notifications
+- [x] Complete state management with Zustand 5 + persistent hydration
+- [x] Realistic mock engine (`mockDb.js`) with timed worker offers and AI semantic matching
+- [x] Authentication screens (login / register) & session storage
+- [x] Worker mode screens (nearby requests, send offer, active job, earnings, profile)
+- [x] End-to-end client tracking, chat, and rating screens
+- [ ] Backend implementation: Express controllers, Prisma migrations, PostgreSQL + pgvector
+- [ ] Connect mobile app to live backend (`EXPO_PUBLIC_USE_MOCKS=false`)
+- [ ] WebSocket real-time gateway for instant offer alerts
+- [ ] Push notifications (Expo Notifications)
 - [ ] Arabic translation and RTL layout
-- [ ] Payments (cash first, then card / wallet)
-- [ ] Automated tests and CI
-- [ ] Deployment (API + database) and store release
+- [ ] Production deployment & App Store / Play Store release
 
 ## Author
 
