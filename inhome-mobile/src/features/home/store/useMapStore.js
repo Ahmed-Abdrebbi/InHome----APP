@@ -1,79 +1,46 @@
-// File: src/store/useMapStore.js
+// File: src/features/home/store/useMapStore.js
 import { create } from 'zustand';
+import providersApi from '../api/providersApi';
+import { DEFAULT_CITY } from '../../../core/config/constants';
 
-/**
- * Mock data representing service providers (prestataires)
- * located around Fquih Ben Salah and neighboring Moroccan regions.
- */
-const INITIAL_PROVIDERS = [
-  {
-    id: '1',
-    name: 'Youssef El Amrani',
-    category: 'Plomberie',
-    rating: 4.9,
-    reviewsCount: 38,
-    price: '150 DH',
-    latitude: 32.5020,
-    longitude: -6.6850,
-  },
-  {
-    id: '2',
-    name: 'Karim Bennani',
-    category: 'Électricité',
-    rating: 4.8,
-    reviewsCount: 29,
-    price: '120 DH',
-    latitude: 32.4980,
-    longitude: -6.6800,
-  },
-  {
-    id: '3',
-    name: 'Hassan Mansouri',
-    category: 'Peinture',
-    rating: 4.7,
-    reviewsCount: 42,
-    price: '200 DH',
-    latitude: 32.5060,
-    longitude: -6.6900,
-  },
-  {
-    id: '4',
-    name: 'Rachid Tazi',
-    category: 'Plomberie',
-    rating: 4.9,
-    reviewsCount: 51,
-    price: '180 DH',
-    latitude: 32.5100,
-    longitude: -6.6780,
-  },
-  {
-    id: '5',
-    name: 'Omar Alami',
-    category: 'Électricité',
-    rating: 4.6,
-    reviewsCount: 19,
-    price: '130 DH',
-    latitude: 32.4950,
-    longitude: -6.6920,
-  },
-  {
-    id: '6',
-    name: 'Mustapha Chraibi',
-    category: 'Peinture',
-    rating: 4.8,
-    reviewsCount: 33,
-    price: '220 DH',
-    latitude: 32.5040,
-    longitude: -6.6750,
-  },
-];
+export const useMapStore = create((set, get) => ({
+  selectedCategory: 'tous',
+  selectedProvider: null,
+  providers: [],
+  loading: false,
+  error: null,
 
-const useMapStore = create((set) => ({
-  selectedCategory: 'All',
-  providers: INITIAL_PROVIDERS,
+  setSelectedCategory: (category) => {
+    set({ selectedCategory: category });
+    get().fetchProviders();
+  },
 
-  setSelectedCategory: (category) =>
-    set({ selectedCategory: category }),
+  setSelectedProvider: (provider) => {
+    set({ selectedProvider: provider });
+  },
+
+  fetchProviders: async (coords = null) => {
+    set({ loading: true, error: null });
+    const { selectedCategory } = get();
+    const lat = coords?.latitude || DEFAULT_CITY.latitude;
+    const lng = coords?.longitude || DEFAULT_CITY.longitude;
+
+    try {
+      const providers = await providersApi.getNearby({
+        latitude: lat,
+        longitude: lng,
+        category: selectedCategory === 'All' || selectedCategory === 'tous' ? null : selectedCategory,
+        radiusKm: 15,
+      });
+
+      set({ providers, loading: false });
+      return providers;
+    } catch (e) {
+      console.warn('[useMapStore] fetchProviders error:', e);
+      set({ loading: false, error: e.message });
+      return [];
+    }
+  },
 }));
 
 export default useMapStore;
