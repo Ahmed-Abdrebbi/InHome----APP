@@ -16,6 +16,9 @@ import MenuDrawerScreen from '../../features/home/screens/MenuDrawerScreen';
 // Booking
 import ProviderDetailsScreen from '../../features/booking/screens/ProviderDetailsScreen';
 import PriceProposalScreen from '../../features/booking/screens/PriceProposalScreen';
+import RequestDetailsScreen from '../../features/booking/screens/RequestDetailsScreen';
+import SearchingArtisanScreen from '../../features/booking/screens/SearchingArtisanScreen';
+import BidPriceModalScreen from '../../features/booking/screens/BidPriceModalScreen';
 import SearchingRadarScreen from '../../features/booking/screens/SearchingRadarScreen';
 import ConfirmationScreen from '../../features/booking/screens/ConfirmationScreen';
 
@@ -65,6 +68,23 @@ const AppNavigator = () => {
         <Stack.Screen
           name="ProviderDetails"
           component={ProviderDetailsScreen}
+        />
+        <Stack.Screen
+          name="RequestDetails"
+          component={RequestDetailsScreen}
+        />
+        <Stack.Screen
+          name="SearchingArtisan"
+          component={SearchingArtisanScreen}
+        />
+        <Stack.Screen
+          name="BidPriceModal"
+          component={BidPriceModalScreen}
+          options={{
+            presentation: 'transparentModal',
+            animation: 'slide_from_bottom',
+            headerShown: false,
+          }}
         />
         <Stack.Screen
           name="PriceProposal"
