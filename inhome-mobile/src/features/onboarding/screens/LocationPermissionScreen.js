@@ -27,6 +27,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { majorelleTheme } from '../../../core/theme/themes/majorelle';
 import { tokens } from '../../../core/theme/tokens';
+import { useSettingsStore } from '../../account/store/useSettingsStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -54,6 +55,9 @@ export default function LocationPermissionScreen({ navigation, onComplete }) {
   };
 
   const goNext = () => {
+    try {
+      useSettingsStore.getState().setHasSeenOnboarding(true);
+    } catch (_) {}
     if (typeof onComplete === 'function') {
       onComplete();
       return;
