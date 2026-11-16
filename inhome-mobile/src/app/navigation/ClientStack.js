@@ -59,6 +59,15 @@ export const ClientStack = () => {
         options={{ animation: 'fade_from_bottom' }}
       />
       <Stack.Screen
+        name="SearchServices"
+        component={SearchServiceScreen}
+        options={{ animation: 'fade_from_bottom' }}
+      />
+      <Stack.Screen
+        name="Favorites"
+        component={SavedAddressesScreen}
+      />
+      <Stack.Screen
         name={ROUTES.LOCATION_PICKER}
         component={LocationPickerScreen}
         options={{ animation: 'slide_from_bottom' }}

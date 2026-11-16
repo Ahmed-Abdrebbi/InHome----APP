@@ -1,390 +1,1238 @@
-// File: src/features/home/screens/MapHomeScreen.js
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   StatusBar,
-  TouchableOpacity,
-  Alert,
-  Platform,
+  ScrollView,
+  Pressable,
+  Animated,
+  Dimensions,
 } from 'react-native';
-import MapView, { Marker, Callout } from '../../../shared/components/map/CustomMapView';
-import * as Location from 'expo-location';
-import {
-  Menu,
-  Wrench,
-  Zap,
-  Paintbrush,
-  Star,
-  Crosshair,
-} from 'lucide-react-native';
-import { useTheme } from '../../../core/theme';
-import { ROUTES } from '../../../app/navigation/routes';
-import BottomSheetContainer from '../../../shared/components/ui/BottomSheetContainer';
-import useMapStore from '../store/useMapStore';
-import useLocationStore from '../store/useLocationStore';
-import { useBookingStore } from '../../booking/store/useBookingStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Defs, Pattern, Path, Circle, Rect } from 'react-native-svg';
+import { MaterialIcons } from '@expo/vector-icons';
+import { majorelleTheme } from '../../../core/theme/themes/majorelle';
+import { tokens } from '../../../core/theme/tokens';
 
-/**
- * Custom dark map style for Google Maps & Apple Maps
- */
-const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#1A1D24' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8A92A6' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#1A1D24' }] },
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const SERVICES = [
   {
-    featureType: 'administrative.locality',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#DCE1EB' }],
+    id: 'plumbing',
+    label: 'Plomberie',
+    price: '~150 DH',
+    icon: 'plumbing',
+    tintBg: 'rgba(63, 215, 196, 0.15)',
+    tintColor: '#63F4E0',
   },
   {
-    featureType: 'poi',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#6C757D' }],
+    id: 'electricity',
+    label: 'Électricité',
+    price: '~120 DH',
+    icon: 'bolt',
+    tintBg: 'rgba(255, 179, 0, 0.15)',
+    tintColor: '#FFB300',
   },
   {
-    featureType: 'poi.park',
-    elementType: 'geometry',
-    stylers: [{ color: '#15222E' }],
+    id: 'painting',
+    label: 'Peinture',
+    price: '~200 DH',
+    icon: 'format-paint',
+    tintBg: 'rgba(255, 180, 171, 0.15)',
+    tintColor: '#FFB4AB',
   },
   {
-    featureType: 'road',
-    elementType: 'geometry',
-    stylers: [{ color: '#2C3240' }],
+    id: 'cleaning',
+    label: 'Ménage',
+    price: '~80 DH/h',
+    icon: 'cleaning-services',
+    tintBg: 'rgba(224, 224, 255, 0.15)',
+    tintColor: '#BDC2FF',
   },
   {
-    featureType: 'road',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#202530' }],
+    id: 'moving',
+    label: 'Transport',
+    price: 'Sur devis',
+    icon: 'local-shipping',
+    tintBg: 'rgba(255, 222, 172, 0.2)',
+    tintColor: '#FFDEAC',
   },
   {
-    featureType: 'road.highway',
-    elementType: 'geometry',
-    stylers: [{ color: '#3A4254' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'geometry',
-    stylers: [{ color: '#242B38' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'geometry',
-    stylers: [{ color: '#0F141C' }],
+    id: 'hvac',
+    label: 'Clim & Froid',
+    price: '~180 DH',
+    icon: 'ac-unit',
+    tintBg: 'rgba(99, 244, 224, 0.15)',
+    tintColor: '#63F4E0',
   },
 ];
 
-const INITIAL_REGION = {
-  latitude: 32.5000,
-  longitude: -6.6833,
-  latitudeDelta: 0.04,
-  longitudeDelta: 0.04,
-};
+const SAVED_ADDRESSES = [
+  {
+    id: 'home',
+    title: 'Domicile',
+    subtitle: 'Av. Marrakech, Guéliz',
+    icon: 'location-on',
+    isFavorite: true,
+  },
+  {
+    id: 'office',
+    title: 'Bureau',
+    subtitle: 'Centre-ville, Bd Mohammed V',
+    icon: 'business-center',
+    isFavorite: false,
+  },
+];
 
-const getCategoryIcon = (category) => {
-  switch (category) {
-    case 'Électricité':
-      return Zap;
-    case 'Peinture':
-      return Paintbrush;
-    case 'Plomberie':
-    default:
-      return Wrench;
-  }
-};
+export default function MapHomeScreen({ navigation, userName = 'Ahmed' }) {
+  const { colors } = majorelleTheme;
+  const insets = useSafeAreaInsets();
 
-const MapHomeScreen = ({ navigation }) => {
-  const mapRef = useRef(null);
-  const { theme } = useTheme();
+  const [selectedServiceId, setSelectedServiceId] = useState('plumbing');
+  const [searchQuery, setSearchQuery] = useState('');
+  const recenterRotate = useRef(new Animated.Value(0)).current;
 
-  const selectedCategory = useMapStore((state) => state.selectedCategory);
-  const providers = useMapStore((state) => state.providers);
-  const userLocation = useLocationStore((state) => state.userLocation);
-  const { updateDraft } = useBookingStore();
+  const selectedService =
+    SERVICES.find((s) => s.id === selectedServiceId) || SERVICES[0];
 
-  const filteredProviders =
-    selectedCategory === 'All'
-      ? providers
-      : providers.filter((p) => p.category === selectedCategory);
-
-  const initialLocation = userLocation || INITIAL_REGION;
-
-  const handleSearchCity = async (cityName) => {
-    try {
-      const query =
-        cityName.toLowerCase().includes('morocco') || cityName.toLowerCase().includes('maroc')
-          ? cityName
-          : `${cityName}, Morocco`;
-
-      const results = await Location.geocodeAsync(query);
-
-      if (results && results.length > 0) {
-        const { latitude, longitude } = results[0];
-        mapRef.current?.animateToRegion(
-          {
-            latitude,
-            longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          },
-          1000
-        );
-      } else {
-        Alert.alert(
-          'Ville non trouvée',
-          `Impossible de localiser "${cityName}". Veuillez vérifier le nom de la ville.`
-        );
-      }
-    } catch (error) {
-      console.warn('Geocoding error:', error);
-      Alert.alert(
-        'Recherche impossible',
-        'Une erreur est survenue lors de la recherche de la ville.'
-      );
-    }
+  const handleRecenter = () => {
+    Animated.sequence([
+      Animated.timing(recenterRotate, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(recenterRotate, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
-  const handleSelectAddress = (address) => {
-    updateDraft({ address: address.name });
-    if (navigation) {
-      navigation.navigate(ROUTES.PROVIDER_DETAILS, { address: address.name });
-    }
-  };
+  const rotateInterpolate = recenterRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '45deg'],
+  });
 
-  const handleSelectProvider = (provider) => {
-    updateDraft({
-      category: provider.category,
-      providerId: provider.id,
-      address: 'Intervention à proximité',
-    });
-    if (navigation) {
-      navigation.navigate(ROUTES.PROVIDER_DETAILS, { provider });
-    }
-  };
-
-  const handleCenterOnUser = () => {
-    if (userLocation && mapRef.current) {
-      mapRef.current.animateToRegion(
-        {
-          latitude: userLocation.latitude,
-          longitude: userLocation.longitude,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
-        },
-        800
-      );
+  const handleOrderService = () => {
+    if (navigation?.navigate) {
+      navigation.navigate('PriceProposal', {
+        service: selectedService,
+        query: searchQuery,
+      });
     }
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+    <View style={[styles.root, { backgroundColor: colors.surface }]}>
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
 
-      {/* Live Interactive Map */}
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
-        initialRegion={{
-          latitude: initialLocation.latitude,
-          longitude: initialLocation.longitude,
-          latitudeDelta: 0.04,
-          longitudeDelta: 0.04,
-        }}
-        customMapStyle={DARK_MAP_STYLE}
-        showsUserLocation={true}
-        showsCompass={false}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
       >
-        {filteredProviders.map((provider) => {
-          const IconComponent = getCategoryIcon(provider.category);
-          return (
-            <Marker
-              key={provider.id}
-              coordinate={{
-                latitude: provider.latitude,
-                longitude: provider.longitude,
-              }}
-              title={provider.name}
-              description={`${provider.category} • ${provider.price}`}
+        {/* 1. Map Canvas & Top Navigation Layer */}
+        <View style={[styles.mapCanvas, { backgroundColor: colors.surface }]}>
+          {/* Map Vector Grounding Elements (Casablanca Coastline + Roads + Zellige Watermark) */}
+          <Svg
+            width={SCREEN_WIDTH}
+            height={380}
+            viewBox="0 0 390 380"
+            preserveAspectRatio="none"
+            style={StyleSheet.absoluteFill}
+          >
+            <Defs>
+              <Pattern
+                id="zellige-pattern"
+                width="60"
+                height="60"
+                patternUnits="userSpaceOnUse"
+              >
+                <Path
+                  d="M30 15 L33 24 L42 21 L36 29 L45 30 L36 31 L42 39 L33 36 L30 45 L27 36 L18 39 L24 31 L15 30 L24 29 L18 21 L27 24 Z"
+                  fill="#63F4E0"
+                  fillOpacity="0.04"
+                />
+                <Circle
+                  cx="30"
+                  cy="30"
+                  r="1.5"
+                  fill="#FFD79B"
+                  fillOpacity="0.05"
+                />
+              </Pattern>
+            </Defs>
+
+            {/* Casablanca Atlantic Shoreline */}
+            <Path
+              d="M-20 -10 Q140 110 410 40 L410 -20 L-20 -20 Z"
+              fill="#003731"
+              opacity="0.35"
+            />
+            <Path
+              d="M-10 10 Q150 95 400 32"
+              fill="none"
+              stroke="#63F4E0"
+              strokeOpacity="0.25"
+              strokeWidth="2.5"
+            />
+
+            {/* Zellige Watermark Texture across map bed */}
+            <Rect width="390" height="380" fill="url(#zellige-pattern)" />
+
+            {/* Major Moroccan Arterials & Road Grids */}
+            {/* Bd de la Corniche & Bd d'Anfa */}
+            <Path
+              d="M-10 130 C120 150 210 110 410 170"
+              fill="none"
+              stroke="#161E3C"
+              strokeLinecap="round"
+              strokeWidth="16"
+            />
+            <Path
+              d="M-10 130 C120 150 210 110 410 170"
+              fill="none"
+              stroke="#212847"
+              strokeLinecap="round"
+              strokeWidth="6"
+            />
+
+            {/* Bd Zerktouni ring */}
+            <Path
+              d="M260 -20 C230 140 180 260 120 390"
+              fill="none"
+              stroke="#161E3C"
+              strokeWidth="14"
+            />
+            <Path
+              d="M260 -20 C230 140 180 260 120 390"
+              fill="none"
+              stroke="#212847"
+              strokeWidth="5"
+            />
+
+            {/* Bd Massira Al Khadra */}
+            <Path
+              d="M40 280 Q210 230 390 310"
+              fill="none"
+              stroke="#161E3C"
+              strokeWidth="12"
+            />
+            <Path
+              d="M40 280 Q210 230 390 310"
+              fill="none"
+              stroke="#2C3352"
+              strokeWidth="4"
+            />
+
+            {/* Secondary Street Mesh */}
+            <Path
+              d="M70 70 L140 240 M210 80 L290 280 M330 150 L390 230 M-10 210 L160 330 M180 300 L270 380"
+              fill="none"
+              stroke="#161E3C"
+              strokeDasharray="2 3"
+              strokeWidth="3"
+              opacity="0.6"
+            />
+          </Svg>
+
+          {/* Top Floating Quick Controls */}
+          <View
+            style={[
+              styles.topControlsRow,
+              { paddingTop: Math.max(insets.top, 12) + 6 },
+            ]}
+          >
+            {/* Menu Drawer Trigger */}
+            <Pressable
+              onPress={() => navigation?.navigate?.('MenuDrawer')}
+              style={({ pressed }) => [
+                styles.menuCircleBtn,
+                pressed && styles.pressedScale95,
+              ]}
+              accessibilityLabel="Menu principal"
             >
-              {/* Custom Marker Pin */}
-              <View style={styles.markerContainer}>
-                <View style={[styles.markerCircle, { backgroundColor: theme.accent }]}>
-                  <IconComponent size={16} color="#FFFFFF" />
-                </View>
-                <View style={[styles.markerTriangle, { borderTopColor: theme.accent }]} />
+              <MaterialIcons name="menu" size={22} color="#DDE1FF" />
+            </Pressable>
+
+            {/* Active Artisans Pill & Recenter Target */}
+            <View style={styles.rightControlsGroup}>
+              <View style={styles.activeArtisansPill}>
+                <View style={styles.liveTealDot} />
+                <Text style={styles.activeArtisansText}>
+                  18 Artisans actifs
+                </Text>
               </View>
 
-              {/* Callout Popup */}
-              <Callout tooltip onPress={() => handleSelectProvider(provider)}>
-                <View
-                  style={[
-                    styles.calloutCard,
-                    {
-                      backgroundColor: theme.surfaceElevated || '#212121',
-                      borderColor: theme.border,
-                    },
-                  ]}
+              <Pressable
+                onPress={handleRecenter}
+                style={({ pressed }) => [
+                  styles.recenterBtn,
+                  pressed && styles.pressedScale90,
+                ]}
+                accessibilityLabel="Recentrer ma position"
+              >
+                <Animated.View
+                  style={{ transform: [{ rotate: rotateInterpolate }] }}
                 >
-                  <Text style={[styles.calloutName, { color: theme.textPrimary }]}>
-                    {provider.name}
+                  <MaterialIcons name="my-location" size={20} color="#FFB300" />
+                </Animated.View>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Active Map Pins */}
+          {/* User Pin: Casablanca, Racine (Anchor) */}
+          <Pressable
+            onPress={() => navigation?.navigate?.('LocationPicker')}
+            style={styles.userPinAnchor}
+          >
+            <View style={styles.locationBadge}>
+              <View style={styles.locationSaffronDot} />
+              <Text style={styles.locationBadgeText}>Casablanca, Racine</Text>
+            </View>
+
+            <View style={styles.userPinRings}>
+              <View style={styles.userOuterHalo} />
+              <View style={styles.userInnerHalo} />
+              <View style={styles.userPinCore}>
+                <MaterialIcons name="home" size={20} color="#6B4900" />
+              </View>
+            </View>
+          </Pressable>
+
+          {/* Artisan Pin 1: Plumber (Teal - 4 min) */}
+          <Pressable
+            onPress={() => setSelectedServiceId('plumbing')}
+            style={styles.artisanPinPlumber}
+          >
+            <View style={[styles.etaBadge, { backgroundColor: '#3FD7C4' }]}>
+              <Text style={[styles.etaBadgeText, { color: '#005A51' }]}>
+                4 min
+              </Text>
+            </View>
+            <View style={styles.pinAvatarWrap}>
+              <View style={styles.tealPinHalo} />
+              <View style={styles.artisanPinCircle}>
+                <MaterialIcons name="plumbing" size={17} color="#63F4E0" />
+              </View>
+            </View>
+          </Pressable>
+
+          {/* Artisan Pin 2: Electrician (Saffron - 7 min) */}
+          <Pressable
+            onPress={() => setSelectedServiceId('electricity')}
+            style={styles.artisanPinElectrician}
+          >
+            <View style={[styles.etaBadge, { backgroundColor: '#FFB300' }]}>
+              <Text style={[styles.etaBadgeText, { color: '#6B4900' }]}>
+                7 min
+              </Text>
+            </View>
+            <View style={styles.pinAvatarWrap}>
+              <View style={styles.saffronPinHalo} />
+              <View style={styles.artisanPinCircle}>
+                <MaterialIcons name="bolt" size={17} color="#FFB300" />
+              </View>
+            </View>
+          </Pressable>
+
+          {/* Artisan Pin 3: Painter (Lavender - 12 min) */}
+          <Pressable
+            onPress={() => setSelectedServiceId('painting')}
+            style={styles.artisanPinPainter}
+          >
+            <View style={[styles.etaBadge, { backgroundColor: '#2C3352' }]}>
+              <Text style={[styles.etaBadgeText, { color: '#BDC2FF' }]}>
+                12 min
+              </Text>
+            </View>
+            <View style={styles.artisanPinCircle}>
+              <MaterialIcons name="format-paint" size={16} color="#BDC2FF" />
+            </View>
+          </Pressable>
+
+          {/* Express Mode Floating Indicator */}
+          <View style={styles.emergencyBanner}>
+            <View style={styles.emergencyLeft}>
+              <MaterialIcons name="bolt" size={18} color="#FFB300" />
+              <Text style={styles.emergencyText}>
+                Mode Urgence 24/7 disponible
+              </Text>
+            </View>
+            <Text style={styles.emergencyStatus}>ACTIF</Text>
+          </View>
+        </View>
+
+        {/* 2. Bottom Sheet Layer */}
+        <View
+          style={[
+            styles.bottomSheet,
+            { paddingBottom: Math.max(insets.bottom, 16) + 8 },
+          ]}
+        >
+          {/* Drag Handle */}
+          <View style={styles.dragHandle} />
+
+          <View style={styles.sheetBody}>
+            {/* Greeting & Heading Prompt */}
+            <View style={styles.greetingRow}>
+              <View style={styles.greetingTextCol}>
+                <View style={styles.greetingSubRow}>
+                  <Text style={styles.greetingSubText}>
+                    Bonjour {userName} 👋
                   </Text>
-                  <Text style={[styles.calloutCategory, { color: theme.textSecondary }]}>
-                    {provider.category} • {provider.price}
-                  </Text>
-                  <View style={styles.calloutRating}>
-                    <Star size={12} color="#FFB300" fill="#FFB300" />
-                    <Text style={[styles.calloutRatingText, { color: theme.accent }]}>
-                      {provider.rating} ({provider.reviewsCount} avis)
-                    </Text>
+                  <View style={styles.vipPill}>
+                    <Text style={styles.vipPillText}>VIP Pro</Text>
                   </View>
                 </View>
-              </Callout>
-            </Marker>
-          );
-        })}
-      </MapView>
+                <Text style={styles.mainQuestion}>
+                  De quoi avez-vous besoin ?
+                </Text>
+              </View>
 
-      {/* Floating UI Overlays */}
-      <View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'box-none' }]}>
-        {/* Top Controls */}
-        <View style={styles.topRow}>
-          {/* Hamburger Menu Button */}
-          <TouchableOpacity
-            style={[
-              styles.floatingBtn,
-              {
-                backgroundColor: theme.surfaceElevated || '#212121',
-                borderColor: theme.border,
-              },
-            ]}
-            onPress={() => navigation && navigation.navigate(ROUTES.MENU_DRAWER)}
-            activeOpacity={0.85}
-          >
-            <Menu size={22} color={theme.textPrimary} />
-          </TouchableOpacity>
+              <Pressable
+                onPress={() => navigation?.navigate?.('Notifications')}
+                style={({ pressed }) => [
+                  styles.bellBtn,
+                  pressed && styles.pressedScale95,
+                ]}
+              >
+                <MaterialIcons
+                  name="notifications-active"
+                  size={20}
+                  color="#FFB300"
+                />
+              </Pressable>
+            </View>
 
-          {/* Center GPS Button */}
-          <TouchableOpacity
-            style={[
-              styles.floatingBtn,
-              {
-                backgroundColor: theme.surfaceElevated || '#212121',
-                borderColor: theme.border,
-              },
-            ]}
-            onPress={handleCenterOnUser}
-            activeOpacity={0.85}
-          >
-            <Crosshair size={20} color={theme.textPrimary} />
-          </TouchableOpacity>
+            {/* Pill Search Bar with Dirham Price Cue */}
+            <View style={styles.searchBar}>
+              <MaterialIcons name="search" size={20} color="#D6C4AC" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Quel service, et à quel prix ?"
+                placeholderTextColor="#D6C4AC"
+                style={styles.searchInput}
+                returnKeyType="search"
+                onSubmitEditing={() =>
+                  navigation?.navigate?.('SearchServices', {
+                    initialQuery: searchQuery,
+                  })
+                }
+              />
+              <Pressable
+                onPress={() => navigation?.navigate?.('SearchServices')}
+                style={({ pressed }) => [
+                  styles.filterCircleBtn,
+                  pressed && styles.pressedScale90,
+                ]}
+              >
+                <MaterialIcons name="tune" size={16} color="#FFB300" />
+              </Pressable>
+            </View>
+
+            {/* Service Category Tiles Section */}
+            <View style={styles.servicesSection}>
+              <View style={styles.servicesHeader}>
+                <Text style={styles.sectionCapsTitle}>
+                  SERVICES À PROXIMITÉ
+                </Text>
+                <Pressable
+                  onPress={() => navigation?.navigate?.('SearchServices')}
+                >
+                  <Text style={styles.seeAllLink}>Tout voir (14)</Text>
+                </Pressable>
+              </View>
+
+              {/* Horizontal Scrollable Service Tiles */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tilesScrollContent}
+                style={styles.tilesScrollView}
+              >
+                {SERVICES.map((service) => {
+                  const isSelected = service.id === selectedServiceId;
+
+                  return (
+                    <Pressable
+                      key={service.id}
+                      onPress={() => setSelectedServiceId(service.id)}
+                      style={({ pressed }) => [
+                        styles.serviceTile,
+                        isSelected && styles.serviceTileActive,
+                        pressed && styles.pressedScale95,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.serviceIconBox,
+                          {
+                            backgroundColor: isSelected
+                              ? 'rgba(0, 90, 81, 0.15)'
+                              : service.tintBg,
+                          },
+                        ]}
+                      >
+                        <MaterialIcons
+                          name={service.icon}
+                          size={22}
+                          color={isSelected ? '#005A51' : service.tintColor}
+                        />
+                      </View>
+                      <Text
+                        style={[
+                          styles.serviceTileLabel,
+                          isSelected && styles.serviceTileLabelActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {service.label}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.serviceTilePrice,
+                          isSelected && styles.serviceTilePriceActive,
+                        ]}
+                      >
+                        {service.price}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Quick Action CTA Card: Demander un artisan express */}
+            <LinearGradient
+              colors={['#212847', '#161E3C']}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.expressCard}
+            >
+              <View style={styles.expressLeft}>
+                <View style={styles.expressIconCircle}>
+                  <MaterialIcons name="speed" size={22} color="#FFB300" />
+                </View>
+                <View style={styles.expressCopy}>
+                  <Text style={styles.expressTitle}>
+                    Artisan en moins de 15 min
+                  </Text>
+                  <Text style={styles.expressSubtitle}>
+                    Attribution directe sans négociation
+                  </Text>
+                </View>
+              </View>
+
+              <Pressable
+                onPress={handleOrderService}
+                style={({ pressed }) => [
+                  styles.proposerPillBtn,
+                  pressed && styles.pressedScale95,
+                ]}
+              >
+                <Text style={styles.proposerPillText}>Proposer</Text>
+              </Pressable>
+            </LinearGradient>
+
+            {/* Recent Saved Addresses Section */}
+            <View style={styles.addressesSection}>
+              <Text style={styles.addressesHeader}>ADRESSES RÉCENTES</Text>
+
+              {SAVED_ADDRESSES.map((addr) => (
+                <Pressable
+                  key={addr.id}
+                  onPress={() =>
+                    navigation?.navigate?.('LocationPicker', { address: addr })
+                  }
+                  style={({ pressed }) => [
+                    styles.addressRow,
+                    pressed && styles.addressRowPressed,
+                  ]}
+                >
+                  <View style={styles.addressLeft}>
+                    <View style={styles.addressIconCircle}>
+                      <MaterialIcons
+                        name={addr.icon}
+                        size={19}
+                        color="#BDC2FF"
+                      />
+                    </View>
+                    <View>
+                      <Text style={styles.addressTitle}>{addr.title}</Text>
+                      <Text style={styles.addressSubtitle}>
+                        {addr.subtitle}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.addressRight}>
+                    {addr.isFavorite && (
+                      <View style={styles.favoriBadge}>
+                        <Text style={styles.favoriBadgeText}>Favori</Text>
+                      </View>
+                    )}
+                    <MaterialIcons
+                      name="chevron-right"
+                      size={18}
+                      color="#9E8E78"
+                    />
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Primary Action CTA Button */}
+            <Pressable
+              onPress={handleOrderService}
+              style={({ pressed }) => [
+                styles.primaryCtaBtn,
+                pressed && styles.primaryCtaPressed,
+              ]}
+            >
+              <MaterialIcons name="handyman" size={22} color="#6B4900" />
+              <Text style={styles.primaryCtaText}>
+                Commander un service ({selectedService.label})
+              </Text>
+            </Pressable>
+          </View>
         </View>
-
-        {/* Bottom Sheet Section */}
-        <View style={styles.bottomSheetWrapper}>
-          <BottomSheetContainer
-            onSearchCity={handleSearchCity}
-            onSelectAddress={handleSelectAddress}
-            onSearchPress={() => navigation && navigation.navigate(ROUTES.SEARCH_SERVICE)}
-          />
-        </View>
-      </View>
+      </ScrollView>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
   },
-  topRow: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 56 : 48,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    zIndex: 10,
-    pointerEvents: 'box-none',
+  scrollView: {
+    flex: 1,
   },
-  floatingBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  scrollContent: {
+    flexGrow: 1,
+  },
+  // Map Canvas (380px)
+  mapCanvas: {
+    width: '100%',
+    height: 380,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  topControlsRow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 20,
+  },
+  menuCircleBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#212847',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    shadowColor: '#000000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  rightControlsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  activeArtisansPill: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(33, 40, 71, 0.92)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  liveTealDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#63F4E0',
+  },
+  activeArtisansText: {
+    fontFamily: tokens.fonts.semiBold,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: '#63F4E0',
+  },
+  recenterBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#212847',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  // User Pin (Casablanca, Racine)
+  userPinAnchor: {
+    position: 'absolute',
+    left: '45%',
+    top: 148,
+    transform: [{ translateX: -66 }, { translateY: -36 }],
+    zIndex: 10,
+    alignItems: 'center',
+  },
+  locationBadge: {
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(44, 51, 82, 0.96)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
   },
-  markerContainer: {
-    alignItems: 'center',
+  locationSaffronDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFB300',
   },
-  markerCircle: {
+  locationBadgeText: {
+    fontFamily: tokens.fonts.semiBold,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: '#DDE1FF',
+    letterSpacing: 0.2,
+  },
+  userPinRings: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userOuterHalo: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 179, 0, 0.18)',
+  },
+  userInnerHalo: {
+    position: 'absolute',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 179, 0, 0.3)',
+  },
+  userPinCore: {
     width: 36,
     height: 36,
     borderRadius: 18,
+    backgroundColor: '#FFB300',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  markerTriangle: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 6,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    alignSelf: 'center',
-    marginTop: -1,
-  },
-  calloutCard: {
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    width: 180,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#FFB300',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
-    shadowRadius: 6,
+    shadowRadius: 10,
     elevation: 8,
   },
-  calloutName: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 2,
+  // Artisan Map Pins
+  artisanPinPlumber: {
+    position: 'absolute',
+    left: '22%',
+    top: 88,
+    transform: [{ translateX: -20 }, { translateY: -24 }],
+    zIndex: 10,
+    alignItems: 'center',
   },
-  calloutCategory: {
-    fontSize: 12,
+  artisanPinElectrician: {
+    position: 'absolute',
+    left: '78%',
+    top: 112,
+    transform: [{ translateX: -20 }, { translateY: -24 }],
+    zIndex: 10,
+    alignItems: 'center',
+  },
+  artisanPinPainter: {
+    position: 'absolute',
+    left: '82%',
+    top: 230,
+    transform: [{ translateX: -22 }, { translateY: -24 }],
+    zIndex: 10,
+    alignItems: 'center',
+  },
+  etaBadge: {
     marginBottom: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  calloutRating: {
+  etaBadgeText: {
+    fontFamily: tokens.fonts.bold,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '700',
+  },
+  pinAvatarWrap: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tealPinHalo: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(99, 244, 224, 0.22)',
+  },
+  saffronPinHalo: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 179, 0, 0.2)',
+  },
+  artisanPinCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1023D7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  // Express Mode Floating Banner
+  emergencyBanner: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: 'rgba(33, 40, 71, 0.92)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  calloutRatingText: {
-    fontSize: 11,
+  emergencyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  emergencyText: {
+    fontFamily: tokens.fonts.semiBold,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '600',
+    color: '#DDE1FF',
   },
-  bottomSheetWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  emergencyStatus: {
+    fontFamily: tokens.fonts.bold,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: '#63F4E0',
+    letterSpacing: 0.8,
+  },
+  // Bottom Sheet
+  bottomSheet: {
+    marginTop: -14,
+    width: '100%',
+    backgroundColor: '#121A38',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 10,
+    zIndex: 30,
+    shadowColor: '#040B2A',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#2C3352',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  sheetBody: {
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  // Greeting
+  greetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  greetingTextCol: {
+    flex: 1,
+  },
+  greetingSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  greetingSubText: {
+    fontFamily: tokens.fonts.medium,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+    color: '#D6C4AC',
+  },
+  vipPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 9999,
+    backgroundColor: '#2C3352',
+  },
+  vipPillText: {
+    fontFamily: tokens.fonts.semiBold,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '600',
+    color: '#63F4E0',
+  },
+  mainQuestion: {
+    fontFamily: tokens.fonts.bold,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '700',
+    color: '#DDE1FF',
+    letterSpacing: -0.2,
+    marginTop: 2,
+  },
+  bellBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#161E3C',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Search Bar
+  searchBar: {
+    width: '100%',
+    height: 48,
+    borderRadius: 9999,
+    backgroundColor: '#212847',
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: tokens.fonts.regular,
+    fontSize: 15,
+    color: '#DDE1FF',
+    paddingVertical: 0,
+  },
+  filterCircleBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2C3352',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Service Category Tiles
+  servicesSection: {
+    gap: 8,
+    marginTop: 2,
+  },
+  servicesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionCapsTitle: {
+    fontFamily: tokens.fonts.semiBold,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: '#D6C4AC',
+    letterSpacing: 0.8,
+  },
+  seeAllLink: {
+    fontFamily: tokens.fonts.medium,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+    color: '#63F4E0',
+  },
+  tilesScrollView: {
+    marginHorizontal: -20,
+  },
+  tilesScrollContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+    gap: 10,
+  },
+  serviceTile: {
+    width: 78,
+    height: 86,
+    borderRadius: 16,
+    backgroundColor: '#161E3C',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+  },
+  serviceTileActive: {
+    backgroundColor: '#3FD7C4',
+    shadowColor: '#3FD7C4',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  serviceIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  serviceTileLabel: {
+    fontFamily: tokens.fonts.semiBold,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: '#DDE1FF',
+    letterSpacing: -0.2,
+  },
+  serviceTileLabelActive: {
+    fontFamily: tokens.fonts.bold,
+    fontWeight: '700',
+    color: '#005A51',
+  },
+  serviceTilePrice: {
+    fontFamily: tokens.fonts.medium,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '500',
+    color: '#D6C4AC',
+  },
+  serviceTilePriceActive: {
+    color: 'rgba(0, 90, 81, 0.85)',
+  },
+  // Express Action Card
+  expressCard: {
+    width: '100%',
+    padding: 14,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  expressLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  expressIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 179, 0, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expressCopy: {
+    flex: 1,
+  },
+  expressTitle: {
+    fontFamily: tokens.fonts.semiBold,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: '#DDE1FF',
+  },
+  expressSubtitle: {
+    fontFamily: tokens.fonts.regular,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#D6C4AC',
+    marginTop: 1,
+  },
+  proposerPillBtn: {
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 9999,
+    backgroundColor: '#FFB300',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proposerPillText: {
+    fontFamily: tokens.fonts.bold,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: '#6B4900',
+  },
+  // Recent Saved Addresses
+  addressesSection: {
+    gap: 8,
+    marginTop: 2,
+  },
+  addressesHeader: {
+    fontFamily: tokens.fonts.semiBold,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '600',
+    color: '#9E8E78',
+    letterSpacing: 0.8,
+  },
+  addressRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#161E3C',
+  },
+  addressRowPressed: {
+    backgroundColor: '#212847',
+  },
+  addressLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  addressIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(16, 35, 215, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addressTitle: {
+    fontFamily: tokens.fonts.semiBold,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: '#DDE1FF',
+  },
+  addressSubtitle: {
+    fontFamily: tokens.fonts.regular,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#D6C4AC',
+  },
+  addressRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  favoriBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(63, 215, 196, 0.25)',
+  },
+  favoriBadgeText: {
+    fontFamily: tokens.fonts.medium,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#63F4E0',
+  },
+  // Primary CTA Button
+  primaryCtaBtn: {
+    width: '100%',
+    height: 56,
+    borderRadius: 9999,
+    backgroundColor: '#FFB300',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 4,
+    shadowColor: '#FFB300',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  primaryCtaPressed: {
+    transform: [{ scale: 0.98 }],
+    backgroundColor: '#FFBA38',
+  },
+  primaryCtaText: {
+    fontFamily: tokens.fonts.bold,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '700',
+    color: '#6B4900',
+  },
+  pressedScale95: {
+    transform: [{ scale: 0.95 }],
+  },
+  pressedScale90: {
+    transform: [{ scale: 0.9 }],
   },
 });
-
-export default MapHomeScreen;
