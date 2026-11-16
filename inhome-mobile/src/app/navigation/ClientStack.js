@@ -6,6 +6,7 @@ import { useTheme } from '../../core/theme';
 
 // Home & Search
 import MapHomeScreen from '../../features/home/screens/MapHomeScreen';
+import ZoomedMapScreen from '../../features/home/screens/ZoomeMapScreen';
 import SearchServiceScreen from '../../features/home/screens/SearchServiceScreen';
 import LocationPickerScreen from '../../features/home/screens/LocationPickerScreen';
 import MenuDrawerScreen from '../../features/home/screens/MenuDrawerScreen';
@@ -53,6 +54,9 @@ export const ClientStack = () => {
     >
       {/* Home & Search */}
       <Stack.Screen name={ROUTES.MAP_HOME} component={MapHomeScreen} />
+      <Stack.Screen name={ROUTES.ZOOMED_MAP} component={ZoomedMapScreen} />
+      <Stack.Screen name="ZoomeMap" component={ZoomedMapScreen} />
+      <Stack.Screen name="ZoomeMapScreen" component={ZoomedMapScreen} />
       <Stack.Screen
         name={ROUTES.SEARCH_SERVICE}
         component={SearchServiceScreen}

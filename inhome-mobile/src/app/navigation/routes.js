@@ -21,6 +21,8 @@ export const ROUTES = {
 
   // Client Flow
   MAP_HOME: 'MapHome',
+  ZOOMED_MAP: 'ZoomedMap',
+  ZOOME_MAP: 'ZoomeMap',
   SEARCH_SERVICE: 'SearchService',
   LOCATION_PICKER: 'LocationPicker',
   MENU_DRAWER: 'MenuDrawer',
