@@ -75,7 +75,7 @@ export const ChatScreen = () => {
         ) : (
           <FlatList
             data={messages}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => `${item?.id || "msg"}-${index}`}
             renderItem={renderMessage}
             contentContainerStyle={{ padding: tokens.Spacing.lg }}
           />
