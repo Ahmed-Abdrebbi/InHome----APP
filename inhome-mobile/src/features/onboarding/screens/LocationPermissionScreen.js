@@ -54,16 +54,12 @@ export default function LocationPermissionScreen({ navigation, onComplete }) {
     }).start();
   };
 
-  const goNext = () => {
+  const goNext = async () => {
     try {
-      useSettingsStore.getState().setHasSeenOnboarding(true);
+      await useSettingsStore.getState().setHasSeenOnboarding(true);
     } catch (_) {}
-    if (typeof onComplete === 'function') {
+    if (typeof onComplete === "function") {
       onComplete();
-      return;
-    }
-    if (navigation?.navigate) {
-      navigation.navigate('Login');
     }
   };
 
