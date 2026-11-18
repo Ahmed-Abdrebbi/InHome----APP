@@ -17,6 +17,7 @@ import PriceProposalScreen from '../../features/booking/screens/PriceProposalScr
 import RequestDetailsScreen from '../../features/booking/screens/RequestDetailsScreen';
 import SearchingArtisanScreen from '../../features/booking/screens/SearchingArtisanScreen';
 import BidPriceModalScreen from '../../features/booking/screens/BidPriceModalScreen';
+import RenovationQuoteScreen from '../../features/booking/screens/RenovationQuoteScreen';
 import ConfirmationScreen from '../../features/booking/screens/ConfirmationScreen';
 import SearchingRadarScreen from '../../features/booking/screens/SearchingRadarScreen';
 import OffersListScreen from '../../features/booking/screens/OffersListScreen';
@@ -92,6 +93,7 @@ export const ClientStack = () => {
       <Stack.Screen name={ROUTES.PROVIDER_DETAILS} component={ProviderDetailsScreen} />
       <Stack.Screen name="RequestDetails" component={RequestDetailsScreen} />
       <Stack.Screen name="SearchingArtisan" component={SearchingArtisanScreen} />
+      <Stack.Screen name="RenovationQuote" component={RenovationQuoteScreen} />
       <Stack.Screen
         name="BidPriceModal"
         component={BidPriceModalScreen}

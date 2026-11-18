@@ -109,6 +109,31 @@ export const DevMenuScreen = () => {
           </View>
         </TouchableOpacity>
 
+        
+        <Text style={[styles.sectionTitle, { color: theme.accent, marginTop: tokens.Spacing.xl }]}>
+          Nouvelles Pages Majorelle (9 → 13)
+        </Text>
+
+        {[
+          { label: "Page 10 • Détails de la demande", route: "RequestDetails" },
+          { label: "Page 11 • Recherche Artisan (Radar)", route: "SearchingArtisan" },
+          { label: "Page 12 • Proposer votre prix (InHome Bid)", route: "BidPriceModal" },
+          { label: "Page 13 • Devis Rénovation", route: "RenovationQuote" },
+          { label: "Page 14 • Liste des offres", route: "OffersList" },
+          { label: "Page 15 • Suivi en direct", route: "JobTracking" },
+          { label: "Page 16 • Chat Client / Artisan", route: "Chat" },
+          { label: "Page 18 • Notation & Avis", route: "Rating" },
+        ].map((item) => (
+          <TouchableOpacity
+            key={item.route}
+            onPress={() => navigation.navigate(item.route)}
+            style={[styles.item, { backgroundColor: theme.surface, borderColor: theme.border }]}
+          >
+            <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>{item.label}</Text>
+            <Text style={{ color: theme.accent, fontWeight: "700" }}>Ouvrir →</Text>
+          </TouchableOpacity>
+        ))}
+
         <Text style={[styles.sectionTitle, { color: theme.accent, marginTop: tokens.Spacing.xl }]}>
           Actions Rapides
         </Text>
