@@ -49,7 +49,7 @@ export const LoginScreen = () => {
             </View>
           ) : null}
 
-          <View style={[styles.form, { marginTop: tokens.Spacing.xxl }]}>
+          <View style={[styles.form, { marginTop: tokens.Spacing.xl }]}>
             <Text style={[styles.label, { color: theme.textSecondary }]}>Numéro de téléphone</Text>
             <TextInput
               value={phone}
@@ -86,7 +86,7 @@ export const LoginScreen = () => {
               ]}
             />
 
-            <View style={{ marginTop: tokens.Spacing.xxl }}>
+            <View style={{ marginTop: tokens.Spacing.xl }}>
               {loading ? (
                 <Loader />
               ) : (
