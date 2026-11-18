@@ -1,4 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import MapView, { Marker } from 'react-native-maps';
+import * as Location from 'expo-location';
 import {
   View,
   Text,
@@ -93,12 +95,34 @@ export default function MapHomeScreen({ navigation, userName = 'Ahmed' }) {
 
   const [selectedServiceId, setSelectedServiceId] = useState('plumbing');
   const [searchQuery, setSearchQuery] = useState('');
+  const mapRef = useRef(null);
+  const [userCoords, setUserCoords] = useState({ latitude: 33.5898, longitude: -7.6388 });
+  const [locationLabel, setLocationLabel] = useState('{locationLabel}');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        setUserCoords(coords);
+        mapRef.current?.animateToRegion({ ...coords, latitudeDelta: 0.015, longitudeDelta: 0.015 }, 600);
+        const geo = await Location.reverseGeocodeAsync(coords);
+        if (geo && geo[0]) {
+          const place = [geo[0].city || geo[0].region, geo[0].district || geo[0].street].filter(Boolean).join(', ');
+          if (place) setLocationLabel(place);
+        }
+      } catch (_) {}
+    })();
+  }, []);
   const recenterRotate = useRef(new Animated.Value(0)).current;
 
   const selectedService =
     SERVICES.find((s) => s.id === selectedServiceId) || SERVICES[0];
 
   const handleRecenter = () => {
+    mapRef.current?.animateToRegion({ ...userCoords, latitudeDelta: 0.012, longitudeDelta: 0.012 }, 500);
     Animated.sequence([
       Animated.timing(recenterRotate, {
         toValue: 1,
@@ -120,7 +144,7 @@ export default function MapHomeScreen({ navigation, userName = 'Ahmed' }) {
 
   const handleOrderService = () => {
     if (navigation?.navigate) {
-      navigation.navigate('PriceProposal', {
+      navigation.navigate(selectedService.id === 'moving' ? 'RenovationQuote' : 'RequestDetails', {
         service: selectedService,
         query: searchQuery,
       });
@@ -144,107 +168,41 @@ export default function MapHomeScreen({ navigation, userName = 'Ahmed' }) {
         {/* 1. Map Canvas & Top Navigation Layer */}
         <View style={[styles.mapCanvas, { backgroundColor: colors.surface }]}>
           {/* Map Vector Grounding Elements (Casablanca Coastline + Roads + Zellige Watermark) */}
-          <Svg
-            width={SCREEN_WIDTH}
-            height={380}
-            viewBox="0 0 390 380"
-            preserveAspectRatio="none"
+          <MapView
+            ref={mapRef}
             style={StyleSheet.absoluteFill}
+            userInterfaceStyle="dark"
+            showsUserLocation
+            showsMyLocationButton={false}
+            initialRegion={{
+              latitude: userCoords.latitude,
+              longitude: userCoords.longitude,
+              latitudeDelta: 0.018,
+              longitudeDelta: 0.018,
+            }}
           >
-            <Defs>
-              <Pattern
-                id="zellige-pattern"
-                width="60"
-                height="60"
-                patternUnits="userSpaceOnUse"
-              >
-                <Path
-                  d="M30 15 L33 24 L42 21 L36 29 L45 30 L36 31 L42 39 L33 36 L30 45 L27 36 L18 39 L24 31 L15 30 L24 29 L18 21 L27 24 Z"
-                  fill="#63F4E0"
-                  fillOpacity="0.04"
-                />
-                <Circle
-                  cx="30"
-                  cy="30"
-                  r="1.5"
-                  fill="#FFD79B"
-                  fillOpacity="0.05"
-                />
-              </Pattern>
-            </Defs>
-
-            {/* Casablanca Atlantic Shoreline */}
-            <Path
-              d="M-20 -10 Q140 110 410 40 L410 -20 L-20 -20 Z"
-              fill="#003731"
-              opacity="0.35"
-            />
-            <Path
-              d="M-10 10 Q150 95 400 32"
-              fill="none"
-              stroke="#63F4E0"
-              strokeOpacity="0.25"
-              strokeWidth="2.5"
-            />
-
-            {/* Zellige Watermark Texture across map bed */}
-            <Rect width="390" height="380" fill="url(#zellige-pattern)" />
-
-            {/* Major Moroccan Arterials & Road Grids */}
-            {/* Bd de la Corniche & Bd d'Anfa */}
-            <Path
-              d="M-10 130 C120 150 210 110 410 170"
-              fill="none"
-              stroke="#161E3C"
-              strokeLinecap="round"
-              strokeWidth="16"
-            />
-            <Path
-              d="M-10 130 C120 150 210 110 410 170"
-              fill="none"
-              stroke="#212847"
-              strokeLinecap="round"
-              strokeWidth="6"
-            />
-
-            {/* Bd Zerktouni ring */}
-            <Path
-              d="M260 -20 C230 140 180 260 120 390"
-              fill="none"
-              stroke="#161E3C"
-              strokeWidth="14"
-            />
-            <Path
-              d="M260 -20 C230 140 180 260 120 390"
-              fill="none"
-              stroke="#212847"
-              strokeWidth="5"
-            />
-
-            {/* Bd Massira Al Khadra */}
-            <Path
-              d="M40 280 Q210 230 390 310"
-              fill="none"
-              stroke="#161E3C"
-              strokeWidth="12"
-            />
-            <Path
-              d="M40 280 Q210 230 390 310"
-              fill="none"
-              stroke="#2C3352"
-              strokeWidth="4"
-            />
-
-            {/* Secondary Street Mesh */}
-            <Path
-              d="M70 70 L140 240 M210 80 L290 280 M330 150 L390 230 M-10 210 L160 330 M180 300 L270 380"
-              fill="none"
-              stroke="#161E3C"
-              strokeDasharray="2 3"
-              strokeWidth="3"
-              opacity="0.6"
-            />
-          </Svg>
+            <Marker coordinate={userCoords} title={locationLabel}>
+              <View style={styles.userPinCore}>
+                <MaterialIcons name="home" size={18} color="#6B4900" />
+              </View>
+            </Marker>
+            <Marker
+              coordinate={{ latitude: userCoords.latitude + 0.0035, longitude: userCoords.longitude - 0.003 }}
+              title="Youssef • Plombier (4 min)"
+            >
+              <View style={styles.artisanPinCircle}>
+                <MaterialIcons name="plumbing" size={16} color="#63F4E0" />
+              </View>
+            </Marker>
+            <Marker
+              coordinate={{ latitude: userCoords.latitude - 0.0025, longitude: userCoords.longitude + 0.004 }}
+              title="Karim • Électricien (7 min)"
+            >
+              <View style={styles.artisanPinCircle}>
+                <MaterialIcons name="bolt" size={16} color="#FFB300" />
+              </View>
+            </Marker>
+          </MapView>
 
           {/* Top Floating Quick Controls */}
           <View
@@ -267,6 +225,20 @@ export default function MapHomeScreen({ navigation, userName = 'Ahmed' }) {
 
             {/* Active Artisans Pill & Recenter Target */}
             <View style={styles.rightControlsGroup}>
+              <Pressable
+                onPress={() => navigation?.navigate?.("DevMenu")}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 9999,
+                  backgroundColor: "#FFB300",
+                }}
+              >
+                <Text style={{ color: "#281900", fontWeight: "700", fontSize: 12 }}>
+                  Pages
+                </Text>
+              </Pressable>
+
               <View style={styles.activeArtisansPill}>
                 <View style={styles.liveTealDot} />
                 <Text style={styles.activeArtisansText}>
